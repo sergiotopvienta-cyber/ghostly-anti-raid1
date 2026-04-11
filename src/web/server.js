@@ -568,18 +568,7 @@ function serveStatic(pathname, res) {
     const contentType = ASSET_TYPES[ext] || 'application/octet-stream';
     const file = fs.readFileSync(targetPath);
 
-    const headers = { 'Content-Type': contentType };
-    
-    // Add cache headers for static assets
-    if (ext === '.css' || ext === '.js') {
-        headers['Cache-Control'] = 'public, max-age=3600'; // 1 hour
-    } else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.webp' || ext === '.svg') {
-        headers['Cache-Control'] = 'public, max-age=86400'; // 1 day
-    } else {
-        headers['Cache-Control'] = 'no-cache'; // Don't cache HTML
-    }
-
-    res.writeHead(200, headers);
+    res.writeHead(200, { 'Content-Type': contentType });
     res.end(file);
 }
 
@@ -655,14 +644,7 @@ function decorateUser(user) {
 }
 
 function sendJson(res, statusCode, payload) {
-    const headers = { 'Content-Type': 'application/json; charset=utf-8' };
-    
-    // Add short cache for GET requests
-    if (statusCode === 200) {
-        headers['Cache-Control'] = 'private, max-age=30'; // 30 seconds
-    }
-    
-    res.writeHead(statusCode, headers);
+    res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(payload));
 }
 

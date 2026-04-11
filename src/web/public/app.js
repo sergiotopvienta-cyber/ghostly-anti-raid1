@@ -4,40 +4,46 @@ const state = {
     guildDetail: null
 };
 
-const landingPage = document.getElementById('landing');
-const dashboardPage = document.getElementById('dashboard');
-const guildPage = document.getElementById('guild');
-const loginBtn = document.getElementById('login-btn');
-const logoutBtn = document.getElementById('logout-btn');
-const backBtn = document.getElementById('back-btn');
-const serversGrid = document.getElementById('servers-grid');
-const guildName = document.getElementById('guild-name');
-const message = document.getElementById('message');
-
-loginBtn.addEventListener('click', () => {
-    window.location.href = '/auth/login';
-});
-
-logoutBtn.addEventListener('click', () => {
-    window.location.href = '/auth/logout';
-});
-
-backBtn.addEventListener('click', () => {
-    window.location.href = '/dashboard';
-});
-
 async function init() {
+    const landingPage = document.getElementById('landing');
+    const dashboardPage = document.getElementById('dashboard');
+    const guildPage = document.getElementById('guild');
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const backBtn = document.getElementById('back-btn');
+    const serversGrid = document.getElementById('servers-grid');
+    const guildName = document.getElementById('guild-name');
+    const message = document.getElementById('message');
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            window.location.href = '/auth/login';
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            window.location.href = '/auth/logout';
+        });
+    }
+
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            window.location.href = '/dashboard';
+        });
+    }
+
     try {
         const session = await fetch('/api/session').then(r => r.json());
         state.session = session;
 
-        if (session.authenticated) {
+        if (session.authenticated && loginBtn && logoutBtn) {
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         }
 
         const path = window.location.pathname;
-        
+
         if (path === '/') {
             showPage('landing');
         } else if (path.startsWith('/dashboard/')) {
@@ -49,11 +55,14 @@ async function init() {
         }
     } catch (error) {
         console.error('Init error:', error);
-        showMessage('Error al cargar el dashboard', 'error');
+        if (message) showMessage('Error al cargar el dashboard', 'error');
     }
 }
 
 async function loadServers() {
+    const serversGrid = document.getElementById('servers-grid');
+    if (!serversGrid) return;
+
     try {
         const response = await fetch('/api/guilds');
         const data = await response.json();
@@ -75,13 +84,16 @@ async function loadServers() {
 }
 
 async function loadGuild(guildId) {
+    const guildName = document.getElementById('guild-name');
+    if (!guildName) return;
+
     try {
         const response = await fetch(`/api/guilds/${guildId}`);
         const data = await response.json();
         state.guildDetail = data;
 
         guildName.textContent = data.guild.name;
-        
+
         renderSettingsForm(data.settings);
         renderList('owners-list', data.owners, 'owner');
         renderList('whitelist-list', data.whitelist, 'whitelist');
@@ -247,20 +259,27 @@ async function removeItem(type, id) {
 }
 
 function showPage(page) {
-    landingPage.classList.add('hidden');
-    dashboardPage.classList.add('hidden');
-    guildPage.classList.add('hidden');
+    const landingPage = document.getElementById('landing');
+    const dashboardPage = document.getElementById('dashboard');
+    const guildPage = document.getElementById('guild');
 
-    if (page === 'landing') landingPage.classList.remove('hidden');
-    if (page === 'dashboard') dashboardPage.classList.remove('hidden');
-    if (page === 'guild') guildPage.classList.remove('hidden');
+    if (landingPage) landingPage.classList.add('hidden');
+    if (dashboardPage) dashboardPage.classList.add('hidden');
+    if (guildPage) guildPage.classList.add('hidden');
+
+    if (page === 'landing' && landingPage) landingPage.classList.remove('hidden');
+    if (page === 'dashboard' && dashboardPage) dashboardPage.classList.remove('hidden');
+    if (page === 'guild' && guildPage) guildPage.classList.remove('hidden');
 }
 
 function showMessage(text, type = 'success') {
+    const message = document.getElementById('message');
+    if (!message) return;
+
     message.textContent = text;
     message.className = `message ${type}`;
     message.classList.remove('hidden');
-    
+
     setTimeout(() => {
         message.classList.add('hidden');
     }, 3000);
