@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Collection, Events, ActivityType } = require('discord.js');
 const fs = require('fs');
 const http = require('node:http');
+const zlib = require('node:zlib');
 require('dotenv').config();
 
 const { ensureWeeklyBackups } = require('./utils/security');
@@ -92,8 +93,47 @@ process.on('uncaughtException', (error) => {
 });
 
 const port = Number(process.env.PORT) || 3000;
+
+// Compression middleware
+function createCompressedServer(handler) {
+    return (req, res) => {
+        // Check if client accepts gzip
+        const acceptEncoding = req.headers['accept-encoding'] || '';
+        const supportsGzip = acceptEncoding.includes('gzip');
+        
+        if (supportsGzip) {
+            const gzip = zlib.createGzip();
+            const originalWrite = res.write;
+            const originalEnd = res.end;
+            const chunks = [];
+            
+            res.write = function(chunk) {
+                chunks.push(Buffer.from(chunk));
+                return true;
+            };
+            
+            res.end = function(chunk) {
+                if (chunk) chunks.push(Buffer.from(chunk));
+                const body = Buffer.concat(chunks);
+                
+                if (body.length > 1024) { // Only compress if > 1KB
+                    res.setHeader('Content-Encoding', 'gzip');
+                    gzip.write(body);
+                    gzip.end();
+                    gzip.pipe(res);
+                } else {
+                    originalWrite.call(res, body);
+                    originalEnd.call(res);
+                }
+            };
+        }
+        
+        handler(req, res);
+    };
+}
+
 http
-    .createServer(createWebServer(client))
+    .createServer(createCompressedServer(createWebServer(client)))
     .listen(port, '0.0.0.0', () => {
         console.log(`HTTP listo en el puerto ${port}`);
     });

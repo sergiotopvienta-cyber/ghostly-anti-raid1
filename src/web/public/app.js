@@ -151,28 +151,28 @@ function renderOverview() {
     const totalEvents = eventCounts.reduce((sum, item) => sum + item.total, 0);
 
     heroStats.innerHTML = `
-        <article class="reveal-card" style="animation-delay: 0.1s"><span class="stat-value">${stats.totalGuilds}</span><span class="stat-label">Servidores</span></article>
-        <article class="reveal-card" style="animation-delay: 0.15s"><span class="stat-value">${formatNumber(stats.totalMembers)}</span><span class="stat-label">Miembros</span></article>
-        <article class="reveal-card" style="animation-delay: 0.2s"><span class="stat-value">${totalEvents}</span><span class="stat-label">Eventos</span></article>
+        <article><span class="stat-value">${stats.totalGuilds}</span><span class="stat-label">Servidores</span></article>
+        <article><span class="stat-value">${formatNumber(stats.totalMembers)}</span><span class="stat-label">Miembros</span></article>
+        <article><span class="stat-value">${totalEvents}</span><span class="stat-label">Eventos</span></article>
     `;
 
     overviewCards.innerHTML = `
-        <article class="metric-card reveal-card" style="animation-delay: 0.25s">
+        <article class="metric-card">
             <h3>Bot online</h3>
             <p>${escapeHtml(bot.tag)}</p>
             <strong>${stats.uptimeHours}h</strong>
         </article>
-        <article class="metric-card reveal-card" style="animation-delay: 0.3s">
+        <article class="metric-card">
             <h3>Lockdowns</h3>
             <p>Servidores protegidos</p>
             <strong>${stats.lockdownGuilds}</strong>
         </article>
-        <article class="metric-card reveal-card" style="animation-delay: 0.35s">
+        <article class="metric-card">
             <h3>Whitelist</h3>
             <p>Usuarios de confianza</p>
             <strong>${stats.whitelistEntries}</strong>
         </article>
-        <article class="metric-card reveal-card" style="animation-delay: 0.4s">
+        <article class="metric-card">
             <h3>Bans permanentes</h3>
             <p>Reingreso bloqueado</p>
             <strong>${stats.permanentBans}</strong>
@@ -188,13 +188,10 @@ function renderServerHub() {
     dashboardLocked.classList.add('hidden');
     guildView.classList.add('hidden');
     serverHub.classList.remove('hidden');
-    serverHub.style.animation = 'none';
-    serverHub.offsetHeight; // Trigger reflow
-    serverHub.style.animation = 'float-in 0.4s ease both';
 
     serverGrid.innerHTML = state.guilds.length
-        ? state.guilds.map((guild, index) => `
-            <a class="server-card" href="/dashboard/${guild.id}" style="animation-delay: ${index * 0.05}s">
+        ? state.guilds.map((guild) => `
+            <a class="server-card" href="/dashboard/${guild.id}">
                 <div>
                     <strong>${escapeHtml(guild.name)}</strong>
                     <small>${formatNumber(guild.memberCount)} miembros</small>
@@ -235,16 +232,13 @@ function renderGuildView() {
     serverHub.classList.add('hidden');
     dashboardLocked.classList.add('hidden');
     guildView.classList.remove('hidden');
-    guildView.style.animation = 'none';
-    guildView.offsetHeight; // Trigger reflow
-    guildView.style.animation = 'float-in 0.4s ease both';
 
     guildTitle.textContent = guild.name;
     guildSummary.innerHTML = `
-        <article class="mini-tile reveal-card" style="animation-delay: 0.05s"><span class="mini-label">Servidor</span><span class="mini-value">${escapeHtml(guild.name)}</span></article>
-        <article class="mini-tile reveal-card" style="animation-delay: 0.1s"><span class="mini-label">Miembros</span><span class="mini-value">${formatNumber(guild.memberCount)}</span></article>
-        <article class="mini-tile reveal-card" style="animation-delay: 0.15s"><span class="mini-label">Acceso</span><span class="mini-value">${escapeHtml(accessLevel.replaceAll('_', ' '))}</span></article>
-        <article class="mini-tile reveal-card" style="animation-delay: 0.2s"><span class="mini-label">Backups</span><span class="mini-value">${counts.backups}</span></article>
+        <article class="mini-tile"><span class="mini-label">Servidor</span><span class="mini-value">${escapeHtml(guild.name)}</span></article>
+        <article class="mini-tile"><span class="mini-label">Miembros</span><span class="mini-value">${formatNumber(guild.memberCount)}</span></article>
+        <article class="mini-tile"><span class="mini-label">Acceso</span><span class="mini-value">${escapeHtml(accessLevel.replaceAll('_', ' '))}</span></article>
+        <article class="mini-tile"><span class="mini-label">Backups</span><span class="mini-value">${counts.backups}</span></article>
     `;
 
     renderSettingsForm(settings);
@@ -253,29 +247,29 @@ function renderGuildView() {
     ownerForm.classList.toggle('hidden', !canManageOwners);
 
     ownersList.innerHTML = `
-        <div class="stack-item reveal-card" style="animation-delay: 0.05s"><strong>Owner real</strong><small>${guild.ownerId}</small></div>
-        ${owners.map((owner, i) => stackItemWithRemove(owner.user_id, 'Owner secundario', canManageOwners, () => removeEntry('owners', owner.user_id), i * 0.05)).join('')}
+        <div class="stack-item"><strong>Owner real</strong><small>${guild.ownerId}</small></div>
+        ${owners.map((owner) => stackItemWithRemove(owner.user_id, 'Owner secundario', canManageOwners, () => removeEntry('owners', owner.user_id))).join('')}
     `;
     bindActionButtons(ownersList);
 
     whitelistList.innerHTML = whitelist.length
-        ? whitelist.map((item, i) => stackItemWithRemove(item.user_id, 'Whitelist', true, () => removeEntry('whitelist', item.user_id), i * 0.05)).join('')
+        ? whitelist.map((item) => stackItemWithRemove(item.user_id, 'Whitelist', true, () => removeEntry('whitelist', item.user_id))).join('')
         : emptyStack('Sin whitelist');
     bindActionButtons(whitelistList);
 
     botsList.innerHTML = bots.length
-        ? bots.map((item, i) => stackItemWithRemove(item.user_id, 'Bot autorizado', true, () => removeEntry('bots', item.user_id), i * 0.05)).join('')
+        ? bots.map((item) => stackItemWithRemove(item.user_id, 'Bot autorizado', true, () => removeEntry('bots', item.user_id))).join('')
         : emptyStack('Sin bots autorizados');
     bindActionButtons(botsList);
 
     bansList.innerHTML = bans.length
-        ? bans.map((item, i) => stackItemWithRemove(item.user_id, item.reason || 'Ban permanente', true, () => removeEntry('bans', item.user_id), i * 0.05)).join('')
+        ? bans.map((item) => stackItemWithRemove(item.user_id, item.reason || 'Ban permanente', true, () => removeEntry('bans', item.user_id))).join('')
         : emptyStack('Sin bans permanentes');
     bindActionButtons(bansList);
 
     backupList.innerHTML = backups.length
-        ? backups.map((backup, i) => `
-            <div class="stack-item reveal-card" style="animation-delay: ${i * 0.05}s">
+        ? backups.map((backup) => `
+            <div class="stack-item">
                 <strong>${escapeHtml(backup.type)}</strong>
                 <small>${escapeHtml(backup.created_at)}</small>
                 <small>${escapeHtml(backup.file_path)}</small>
@@ -284,8 +278,8 @@ function renderGuildView() {
         : emptyStack('Sin backups');
 
     severityList.innerHTML = severityCounts.length
-        ? severityCounts.map((item, i) => `
-            <div class="stack-item reveal-card" style="animation-delay: ${i * 0.05}s">
+        ? severityCounts.map((item) => `
+            <div class="stack-item">
                 <strong class="severity-${item.severity}">${item.severity.toUpperCase()}</strong>
                 <small>${item.total} evento(s)</small>
             </div>
@@ -293,14 +287,14 @@ function renderGuildView() {
         : emptyStack('Sin incidentes');
 
     eventList.innerHTML = recentEvents.length
-        ? recentEvents.map((event, i) => `
-            <div class="event-item reveal-card" style="animation-delay: ${i * 0.05}s">
+        ? recentEvents.map((event) => `
+            <div class="event-item">
                 <strong>${escapeHtml(event.type)}</strong>
                 <small>${escapeHtml(event.details || 'Sin detalle')}</small>
                 <small>${escapeHtml(event.created_at)}</small>
             </div>
         `).join('')
-        : `<div class="event-item reveal-card"><strong>Todo quieto</strong><small>No hay eventos recientes en este servidor.</small></div>`;
+        : `<div class="event-item"><strong>Todo quieto</strong><small>No hay eventos recientes en este servidor.</small></div>`;
 }
 
 function renderSettingsForm(settings) {
@@ -450,9 +444,9 @@ async function removeEntry(section, userId) {
     }
 }
 
-function stackItemWithRemove(id, label, removable, handler, delay = 0) {
+function stackItemWithRemove(id, label, removable, handler) {
     return `
-        <div class="stack-item stack-item-action reveal-card" style="animation-delay: ${delay}s">
+        <div class="stack-item stack-item-action">
             <div>
                 <strong>${escapeHtml(label)}</strong>
                 <small>${escapeHtml(id)}</small>

@@ -353,22 +353,45 @@ async function handleSectionDelete(client, guild, viewerUserId, section, targetI
 
 async function buildOverviewPayload(client, viewerUserId) {
     const guilds = await getAllowedGuilds(client, viewerUserId);
-    const eventCounts = [];
-    const recentEvents = [];
-    let totalMembers = 0;
+    
+    // Calculate basic stats from cache (no DB queries needed)
+    const totalMembers = guilds.reduce((sum, guild) => sum + (guild.memberCount || 0), 0);
+    
+    // Parallel queries for all guilds to reduce latency
+    const guildPromises = guilds.map(async (guild) => {
+        const [settings, whitelistCount, bansCount, eventCounts, events] = await Promise.all([
+            client.db.getGuildSettings(guild.id),
+            client.db.listTrustedUsers(guild.id, 'whitelist').then(list => list.length),
+            client.db.listPermanentBans(guild.id).then(list => list.length),
+            client.db.getSecurityEventCounts(guild.id),
+            client.db.getRecentSecurityEvents(guild.id, 3) // Reduced from 4 to 3
+        ]);
+        
+        return {
+            guild,
+            settings,
+            whitelistCount,
+            bansCount,
+            eventCounts,
+            events: events.map(e => ({ ...e, guild_name: guild.name }))
+        };
+    });
+    
+    const results = await Promise.all(guildPromises);
+    
+    // Aggregate results
     let lockdownGuilds = 0;
     let whitelistEntries = 0;
     let permanentBans = 0;
-
-    for (const guild of guilds) {
-        const settings = await client.db.getGuildSettings(guild.id);
-        totalMembers += guild.memberCount || 0;
-        lockdownGuilds += settings.lockdown_active ? 1 : 0;
-        whitelistEntries += (await client.db.listTrustedUsers(guild.id, 'whitelist')).length;
-        permanentBans += (await client.db.listPermanentBans(guild.id)).length;
-
-        const guildCounts = await client.db.getSecurityEventCounts(guild.id);
-        for (const item of guildCounts) {
+    const eventCounts = [];
+    const recentEvents = [];
+    
+    for (const result of results) {
+        lockdownGuilds += result.settings.lockdown_active ? 1 : 0;
+        whitelistEntries += result.whitelistCount;
+        permanentBans += result.bansCount;
+        
+        for (const item of result.eventCounts) {
             const existing = eventCounts.find((entry) => entry.severity === item.severity);
             if (existing) {
                 existing.total += item.total;
@@ -376,11 +399,10 @@ async function buildOverviewPayload(client, viewerUserId) {
                 eventCounts.push({ severity: item.severity, total: item.total });
             }
         }
-
-        const guildEvents = await client.db.getRecentSecurityEvents(guild.id, 4);
-        recentEvents.push(...guildEvents.map((event) => ({ ...event, guild_name: guild.name })));
+        
+        recentEvents.push(...result.events);
     }
-
+    
     recentEvents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     return {
@@ -401,20 +423,22 @@ async function buildOverviewPayload(client, viewerUserId) {
             uptimeHours: Number((process.uptime() / 3600).toFixed(1))
         },
         eventCounts,
-        recentEvents: recentEvents.slice(0, 10)
+        recentEvents: recentEvents.slice(0, 8) // Reduced from 10 to 8
     };
 }
 
 async function buildAllowedGuildList(client, viewerUserId) {
     const guilds = await getAllowedGuilds(client, viewerUserId);
-    const items = [];
+    
+    // Parallel queries for all guilds
+    const guildPromises = guilds.map(async (guild) => {
+        const [settings, incidents, access] = await Promise.all([
+            client.db.getGuildSettings(guild.id),
+            client.db.getRecentSecurityEvents(guild.id, 2), // Reduced from 3 to 2
+            getGuildAccessLevel(client, guild, viewerUserId)
+        ]);
 
-    for (const guild of guilds) {
-        const settings = await client.db.getGuildSettings(guild.id);
-        const incidents = await client.db.getRecentSecurityEvents(guild.id, 3);
-        const access = await getGuildAccessLevel(client, guild, viewerUserId);
-
-        items.push({
+        return {
             id: guild.id,
             name: guild.name,
             icon: guild.iconURL(),
@@ -426,9 +450,10 @@ async function buildAllowedGuildList(client, viewerUserId) {
             },
             accessLevel: access,
             incidents: incidents.length
-        });
-    }
-
+        };
+    });
+    
+    const items = await Promise.all(guildPromises);
     return items.sort((a, b) => b.memberCount - a.memberCount);
 }
 
@@ -439,14 +464,17 @@ async function buildGuildDetail(client, guildId, viewerUserId) {
     const accessLevel = await getGuildAccessLevel(client, guild, viewerUserId);
     if (!accessLevel) return null;
 
-    const settings = await client.db.getGuildSettings(guildId);
-    const recentEvents = await client.db.getRecentSecurityEvents(guildId, 16);
-    const whitelist = await client.db.listTrustedUsers(guildId, 'whitelist');
-    const owners = await client.db.listTrustedUsers(guildId, 'owner');
-    const bots = await client.db.listTrustedUsers(guildId, 'bot');
-    const bans = await client.db.listPermanentBans(guildId);
-    const backups = await client.db.listBackups(guildId, 8);
-    const severities = await client.db.getSecurityEventCounts(guildId);
+    // Parallel queries for all data
+    const [settings, recentEvents, whitelist, owners, bots, bans, backups, severities] = await Promise.all([
+        client.db.getGuildSettings(guildId),
+        client.db.getRecentSecurityEvents(guildId, 10), // Reduced from 16 to 10
+        client.db.listTrustedUsers(guildId, 'whitelist'),
+        client.db.listTrustedUsers(guildId, 'owner'),
+        client.db.listTrustedUsers(guildId, 'bot'),
+        client.db.listPermanentBans(guildId),
+        client.db.listBackups(guildId, 5), // Reduced from 8 to 5
+        client.db.getSecurityEventCounts(guildId)
+    ]);
 
     return {
         accessLevel,
@@ -540,7 +568,18 @@ function serveStatic(pathname, res) {
     const contentType = ASSET_TYPES[ext] || 'application/octet-stream';
     const file = fs.readFileSync(targetPath);
 
-    res.writeHead(200, { 'Content-Type': contentType });
+    const headers = { 'Content-Type': contentType };
+    
+    // Add cache headers for static assets
+    if (ext === '.css' || ext === '.js') {
+        headers['Cache-Control'] = 'public, max-age=3600'; // 1 hour
+    } else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.webp' || ext === '.svg') {
+        headers['Cache-Control'] = 'public, max-age=86400'; // 1 day
+    } else {
+        headers['Cache-Control'] = 'no-cache'; // Don't cache HTML
+    }
+
+    res.writeHead(200, headers);
     res.end(file);
 }
 
@@ -616,7 +655,14 @@ function decorateUser(user) {
 }
 
 function sendJson(res, statusCode, payload) {
-    res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+    const headers = { 'Content-Type': 'application/json; charset=utf-8' };
+    
+    // Add short cache for GET requests
+    if (statusCode === 200) {
+        headers['Cache-Control'] = 'private, max-age=30'; // 30 seconds
+    }
+    
+    res.writeHead(statusCode, headers);
     res.end(JSON.stringify(payload));
 }
 
