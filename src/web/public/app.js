@@ -1,539 +1,279 @@
 const state = {
     session: null,
-    overview: null,
     guilds: [],
     guildDetail: null
 };
 
-// Simple cache for API responses
-const apiCache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const landingPage = document.getElementById('landing');
+const dashboardPage = document.getElementById('dashboard');
+const guildPage = document.getElementById('guild');
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const backBtn = document.getElementById('back-btn');
+const serversGrid = document.getElementById('servers-grid');
+const guildName = document.getElementById('guild-name');
+const message = document.getElementById('message');
 
-const heroStats = document.getElementById('hero-stats');
-const overviewCards = document.getElementById('overview-cards');
-const inviteLink = document.getElementById('invite-link');
-const loginButton = document.getElementById('login-button');
-const logoutButton = document.getElementById('logout-button');
-const authBanner = document.getElementById('auth-banner');
-const dashboardLocked = document.getElementById('dashboard-locked');
-const serverHub = document.getElementById('server-hub');
-const guildView = document.getElementById('guild-view');
-const dashboardUser = document.getElementById('dashboard-user');
-const serverGrid = document.getElementById('server-grid');
-const guildTitle = document.getElementById('guild-title');
-const guildSummary = document.getElementById('guild-summary');
-const settingsForm = document.getElementById('settings-form');
-const ownersList = document.getElementById('owners-list');
-const whitelistList = document.getElementById('whitelist-list');
-const botsList = document.getElementById('bots-list');
-const bansList = document.getElementById('bans-list');
-const backupList = document.getElementById('backup-list');
-const severityList = document.getElementById('severity-list');
-const eventList = document.getElementById('event-list');
-const ownerForm = document.getElementById('owner-form');
-const whitelistForm = document.getElementById('whitelist-form');
-const botForm = document.getElementById('bot-form');
-const banForm = document.getElementById('ban-form');
-const manualBackupButton = document.getElementById('manual-backup-button');
+loginBtn.addEventListener('click', () => {
+    window.location.href = '/auth/login';
+});
 
-logoutButton.addEventListener('click', () => {
+logoutBtn.addEventListener('click', () => {
     window.location.href = '/auth/logout';
 });
 
-ownerForm.addEventListener('submit', (event) => handleSimpleCreate(event, 'owners', 'owner-id-input', 'Owner secundario agregado.'));
-whitelistForm.addEventListener('submit', (event) => handleSimpleCreate(event, 'whitelist', 'whitelist-id-input', 'Usuario agregado a whitelist.'));
-botForm.addEventListener('submit', (event) => handleSimpleCreate(event, 'bots', 'bot-id-input', 'Bot autorizado agregado.'));
+backBtn.addEventListener('click', () => {
+    window.location.href = '/dashboard';
+});
 
-banForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!state.guildDetail) return;
+async function init() {
+    try {
+        const session = await fetch('/api/session').then(r => r.json());
+        state.session = session;
 
-    const userId = document.getElementById('ban-id-input').value.trim();
-    const reason = document.getElementById('ban-reason-input').value.trim();
+        if (session.authenticated) {
+            loginBtn.classList.add('hidden');
+            logoutBtn.classList.remove('hidden');
+        }
+
+        const path = window.location.pathname;
+        
+        if (path === '/') {
+            showPage('landing');
+        } else if (path.startsWith('/dashboard/')) {
+            const guildId = path.split('/')[2];
+            await loadGuild(guildId);
+        } else {
+            await loadServers();
+            showPage('dashboard');
+        }
+    } catch (error) {
+        console.error('Init error:', error);
+        showMessage('Error al cargar el dashboard', 'error');
+    }
+}
+
+async function loadServers() {
+    try {
+        const response = await fetch('/api/guilds');
+        const data = await response.json();
+        state.guilds = data.guilds || [];
+
+        serversGrid.innerHTML = state.guilds.length
+            ? state.guilds.map(guild => `
+                <div class="server-card" onclick="window.location.href='/dashboard/${guild.id}'">
+                    <h3>${escapeHtml(guild.name)}</h3>
+                    <p>${guild.memberCount} miembros</p>
+                    <small>${guild.accessLevel}</small>
+                </div>
+            `).join('')
+            : '<p>No tienes servidores disponibles</p>';
+    } catch (error) {
+        console.error('Error loading servers:', error);
+        showMessage('Error al cargar servidores', 'error');
+    }
+}
+
+async function loadGuild(guildId) {
+    try {
+        const response = await fetch(`/api/guilds/${guildId}`);
+        const data = await response.json();
+        state.guildDetail = data;
+
+        guildName.textContent = data.guild.name;
+        
+        renderSettingsForm(data.settings);
+        renderList('owners-list', data.owners, 'owner');
+        renderList('whitelist-list', data.whitelist, 'whitelist');
+        renderList('bots-list', data.bots, 'bot');
+        renderList('bans-list', data.bans, 'ban');
+
+        setupForms(guildId);
+        showPage('guild');
+    } catch (error) {
+        console.error('Error loading guild:', error);
+        showMessage('No tienes acceso a este servidor', 'error');
+        window.location.href = '/dashboard';
+    }
+}
+
+function renderSettingsForm(settings) {
+    const form = document.getElementById('settings-form');
+    const toggles = [
+        'anti_raid', 'anti_nuke', 'anti_flood', 'anti_bots', 
+        'anti_alts', 'anti_links', 'anti_mentions', 'anti_bot_verified_only', 'lockdown_active'
+    ];
+    const numbers = [
+        'max_joins_per_minute', 'max_messages_per_second', 
+        'max_mentions_per_message', 'min_account_age_days'
+    ];
+    const texts = [
+        'log_channel', 'alert_channel', 'welcome_channel', 'verification_role'
+    ];
+
+    form.innerHTML = `
+        ${toggles.map(key => `
+            <label>
+                <span>${formatKey(key)}</span>
+                <input type="checkbox" name="${key}" ${settings[key] ? 'checked' : ''}>
+            </label>
+        `).join('')}
+        ${numbers.map(key => `
+            <label>
+                <span>${formatKey(key)}</span>
+                <input type="number" name="${key}" value="${settings[key]}">
+            </label>
+        `).join('')}
+        ${texts.map(key => `
+            <label>
+                <span>${formatKey(key)}</span>
+                <input type="text" name="${key}" value="${settings[key] || ''}">
+            </label>
+        `).join('')}
+        <button type="button" class="btn btn-primary" onclick="saveSettings()">Guardar</button>
+    `;
+}
+
+function renderList(containerId, items, type) {
+    const container = document.getElementById(containerId);
+    if (!items || items.length === 0) {
+        container.innerHTML = '<p class="empty">Sin elementos</p>';
+        return;
+    }
+
+    container.innerHTML = items.map(item => `
+        <div class="list-item">
+            <span>${item.user_id || item.id}</span>
+            <button onclick="removeItem('${type}', '${item.user_id || item.id}')">Eliminar</button>
+        </div>
+    `).join('');
+}
+
+function setupForms(guildId) {
+    document.getElementById('owner-form').onsubmit = (e) => handleAdd(e, guildId, 'owners');
+    document.getElementById('whitelist-form').onsubmit = (e) => handleAdd(e, guildId, 'whitelist');
+    document.getElementById('bot-form').onsubmit = (e) => handleAdd(e, guildId, 'bots');
+    document.getElementById('ban-form').onsubmit = (e) => handleBan(e, guildId);
+}
+
+async function handleAdd(e, guildId, type) {
+    e.preventDefault();
+    const input = document.getElementById(`${type.slice(0, -1)}-input`);
+    const userId = input.value.trim();
+    
     if (!userId) return;
 
     try {
-        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/bans`, {
+        await fetch(`/api/guilds/${guildId}/${type}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+        
+        input.value = '';
+        await loadGuild(guildId);
+        showMessage('Agregado correctamente', 'success');
+    } catch (error) {
+        showMessage('Error al agregar', 'error');
+    }
+}
+
+async function handleBan(e, guildId) {
+    e.preventDefault();
+    const userId = document.getElementById('ban-input').value.trim();
+    const reason = document.getElementById('ban-reason').value.trim();
+    
+    if (!userId) return;
+
+    try {
+        await fetch(`/api/guilds/${guildId}/bans`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, reason })
         });
-
-        document.getElementById('ban-id-input').value = '';
-        document.getElementById('ban-reason-input').value = '';
-        flashBanner('Ban permanente agregado.', 'success');
-        await loadGuild(state.guildDetail.guild.id);
-    } catch (error) {
-        flashBanner(error.message, 'error');
-    }
-});
-
-manualBackupButton.addEventListener('click', async () => {
-    if (!state.guildDetail) return;
-
-    try {
-        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/backups`, { method: 'POST' });
-        flashBanner('Backup creado correctamente.', 'success');
-        await loadGuild(state.guildDetail.guild.id);
-    } catch (error) {
-        flashBanner(error.message, 'error');
-    }
-});
-
-init().catch((error) => {
-    console.error('Dashboard bootstrap error:', error);
-    flashBanner('No se pudo cargar la aplicacion.', 'error');
-});
-
-async function init() {
-    showLoadingState();
-    
-    try {
-        state.session = await fetchJson('/api/session');
-
-        if (!state.session.authenticated) {
-            renderGuestState();
-            hideLoadingState();
-            return;
-        }
-
-        loginButton.classList.add('hidden');
-        logoutButton.classList.remove('hidden');
-
-        // Load overview first for faster initial render
-        const overview = await fetchJson('/api/overview');
-        state.overview = overview;
-        renderOverview();
-        renderUserChip();
-
-        // Load guilds in background
-        const guildsResponse = await fetchJson('/api/guilds');
-        state.guilds = guildsResponse.guilds;
-
-        const guildIdFromPath = parseGuildIdFromPath();
-        if (guildIdFromPath) {
-            await loadGuild(guildIdFromPath);
-            hideLoadingState();
-            return;
-        }
-
-        renderServerHub();
-        hideLoadingState();
-    } catch (error) {
-        console.error('Init error:', error);
-        flashBanner('Error al cargar el dashboard. Recarga la pagina.', 'error');
-        hideLoadingState();
-    }
-}
-
-function renderGuestState() {
-    dashboardLocked.classList.remove('hidden');
-    serverHub.classList.add('hidden');
-    guildView.classList.add('hidden');
-    flashBanner('Inicia sesion con Discord para ver tus servidores.', 'info');
-}
-
-function renderUserChip() {
-    const user = state.session.user;
-    dashboardUser.innerHTML = `
-        <div class="user-chip">
-            ${user.avatar ? `<img src="${user.avatar}" alt="${escapeHtml(user.username)}">` : '<span class="avatar-fallback">D</span>'}
-            <div>
-                <strong>${escapeHtml(user.global_name || user.username)}</strong>
-                <small>${escapeHtml(user.username)} · access panel</small>
-            </div>
-        </div>
-    `;
-}
-
-function renderOverview() {
-    const { stats, eventCounts, bot, app } = state.overview;
-    const totalEvents = eventCounts.reduce((sum, item) => sum + item.total, 0);
-
-    heroStats.innerHTML = `
-        <article><span class="stat-value">${stats.totalGuilds}</span><span class="stat-label">Servidores</span></article>
-        <article><span class="stat-value">${formatNumber(stats.totalMembers)}</span><span class="stat-label">Miembros</span></article>
-        <article><span class="stat-value">${totalEvents}</span><span class="stat-label">Eventos</span></article>
-    `;
-
-    overviewCards.innerHTML = `
-        <article class="metric-card">
-            <h3>Bot online</h3>
-            <p>${escapeHtml(bot.tag)}</p>
-            <strong>${stats.uptimeHours}h</strong>
-        </article>
-        <article class="metric-card">
-            <h3>Lockdowns</h3>
-            <p>Servidores protegidos</p>
-            <strong>${stats.lockdownGuilds}</strong>
-        </article>
-        <article class="metric-card">
-            <h3>Whitelist</h3>
-            <p>Usuarios de confianza</p>
-            <strong>${stats.whitelistEntries}</strong>
-        </article>
-        <article class="metric-card">
-            <h3>Bans permanentes</h3>
-            <p>Reingreso bloqueado</p>
-            <strong>${stats.permanentBans}</strong>
-        </article>
-    `;
-
-    if (app.clientId) {
-        inviteLink.href = `https://discord.com/oauth2/authorize?client_id=${app.clientId}&scope=bot%20applications.commands`;
-    }
-}
-
-function renderServerHub() {
-    dashboardLocked.classList.add('hidden');
-    guildView.classList.add('hidden');
-    serverHub.classList.remove('hidden');
-
-    serverGrid.innerHTML = state.guilds.length
-        ? state.guilds.map((guild) => `
-            <a class="server-card" href="/dashboard/${guild.id}">
-                <div>
-                    <strong>${escapeHtml(guild.name)}</strong>
-                    <small>${formatNumber(guild.memberCount)} miembros</small>
-                </div>
-                <div class="server-card-meta">
-                    <span class="pill ${guild.features.lockdown ? 'off' : 'on'}">${guild.features.lockdown ? 'LOCKDOWN' : 'ESTABLE'}</span>
-                    <small>${escapeHtml(guild.accessLevel.replaceAll('_', ' '))}</small>
-                </div>
-            </a>
-        `).join('')
-        : `<div class="locked-card"><h3>No tienes servidores autorizados</h3><p>Debes ser owner real o owner secundario y el bot debe estar dentro.</p></div>`;
-}
-
-async function loadGuild(guildId) {
-    showLoadingState();
-    
-    try {
-        state.guildDetail = await fetchJson(`/api/guilds/${guildId}`);
-        history.replaceState({}, '', `/dashboard/${guildId}`);
         
-        // Render immediately for faster perceived performance
-        requestAnimationFrame(() => {
-            renderGuildView();
-            hideLoadingState();
-        });
+        document.getElementById('ban-input').value = '';
+        document.getElementById('ban-reason').value = '';
+        await loadGuild(guildId);
+        showMessage('Ban agregado', 'success');
     } catch (error) {
-        flashBanner('No tienes acceso a ese servidor o no existe en el bot.', 'error');
-        history.replaceState({}, '', '/dashboard');
-        renderServerHub();
-        hideLoadingState();
+        showMessage('Error al agregar ban', 'error');
     }
-}
-
-function renderGuildView() {
-    const detail = state.guildDetail;
-    const { guild, settings, counts, severityCounts, recentEvents, backups, owners, whitelist, bots, bans, accessLevel } = detail;
-
-    serverHub.classList.add('hidden');
-    dashboardLocked.classList.add('hidden');
-    guildView.classList.remove('hidden');
-
-    guildTitle.textContent = guild.name;
-    guildSummary.innerHTML = `
-        <article class="mini-tile"><span class="mini-label">Servidor</span><span class="mini-value">${escapeHtml(guild.name)}</span></article>
-        <article class="mini-tile"><span class="mini-label">Miembros</span><span class="mini-value">${formatNumber(guild.memberCount)}</span></article>
-        <article class="mini-tile"><span class="mini-label">Acceso</span><span class="mini-value">${escapeHtml(accessLevel.replaceAll('_', ' '))}</span></article>
-        <article class="mini-tile"><span class="mini-label">Backups</span><span class="mini-value">${counts.backups}</span></article>
-    `;
-
-    renderSettingsForm(settings);
-
-    const canManageOwners = accessLevel === 'owner';
-    ownerForm.classList.toggle('hidden', !canManageOwners);
-
-    ownersList.innerHTML = `
-        <div class="stack-item"><strong>Owner real</strong><small>${guild.ownerId}</small></div>
-        ${owners.map((owner) => stackItemWithRemove(owner.user_id, 'Owner secundario', canManageOwners, () => removeEntry('owners', owner.user_id))).join('')}
-    `;
-    bindActionButtons(ownersList);
-
-    whitelistList.innerHTML = whitelist.length
-        ? whitelist.map((item) => stackItemWithRemove(item.user_id, 'Whitelist', true, () => removeEntry('whitelist', item.user_id))).join('')
-        : emptyStack('Sin whitelist');
-    bindActionButtons(whitelistList);
-
-    botsList.innerHTML = bots.length
-        ? bots.map((item) => stackItemWithRemove(item.user_id, 'Bot autorizado', true, () => removeEntry('bots', item.user_id))).join('')
-        : emptyStack('Sin bots autorizados');
-    bindActionButtons(botsList);
-
-    bansList.innerHTML = bans.length
-        ? bans.map((item) => stackItemWithRemove(item.user_id, item.reason || 'Ban permanente', true, () => removeEntry('bans', item.user_id))).join('')
-        : emptyStack('Sin bans permanentes');
-    bindActionButtons(bansList);
-
-    backupList.innerHTML = backups.length
-        ? backups.map((backup) => `
-            <div class="stack-item">
-                <strong>${escapeHtml(backup.type)}</strong>
-                <small>${escapeHtml(backup.created_at)}</small>
-                <small>${escapeHtml(backup.file_path)}</small>
-            </div>
-        `).join('')
-        : emptyStack('Sin backups');
-
-    severityList.innerHTML = severityCounts.length
-        ? severityCounts.map((item) => `
-            <div class="stack-item">
-                <strong class="severity-${item.severity}">${item.severity.toUpperCase()}</strong>
-                <small>${item.total} evento(s)</small>
-            </div>
-        `).join('')
-        : emptyStack('Sin incidentes');
-
-    eventList.innerHTML = recentEvents.length
-        ? recentEvents.map((event) => `
-            <div class="event-item">
-                <strong>${escapeHtml(event.type)}</strong>
-                <small>${escapeHtml(event.details || 'Sin detalle')}</small>
-                <small>${escapeHtml(event.created_at)}</small>
-            </div>
-        `).join('')
-        : `<div class="event-item"><strong>Todo quieto</strong><small>No hay eventos recientes en este servidor.</small></div>`;
-}
-
-function renderSettingsForm(settings) {
-    const toggles = [
-        ['anti_raid', 'Anti-Raid'],
-        ['anti_nuke', 'Anti-Nuke'],
-        ['anti_flood', 'Anti-Flood'],
-        ['anti_bots', 'Anti-Bots'],
-        ['anti_alts', 'Anti-Alts'],
-        ['anti_links', 'Anti-Links'],
-        ['anti_mentions', 'Anti-Mentions'],
-        ['anti_bot_verified_only', 'Solo bots verificados'],
-        ['lockdown_active', 'Lockdown']
-    ];
-
-    const numbers = [
-        ['max_joins_per_minute', 'Max joins/minuto'],
-        ['max_messages_per_second', 'Max mensajes/segundo'],
-        ['max_mentions_per_message', 'Max menciones/mensaje'],
-        ['min_account_age_days', 'Edad minima cuenta']
-    ];
-
-    const textInputs = [
-        ['log_channel', 'Canal de logs (ID)'],
-        ['alert_channel', 'Canal de alertas (ID)'],
-        ['welcome_channel', 'Canal de bienvenida (ID)'],
-        ['verification_role', 'Rol de verificacion (ID)']
-    ];
-
-    settingsForm.innerHTML = `
-        <div class="settings-grid">
-            ${toggles.map(([key, label]) => `
-                <label class="setting-toggle">
-                    <span>${label}</span>
-                    <input type="checkbox" data-setting-key="${key}" ${settings[key] ? 'checked' : ''}>
-                </label>
-            `).join('')}
-            ${numbers.map(([key, label]) => `
-                <label class="setting-number">
-                    <span>${label}</span>
-                    <input type="number" data-setting-key="${key}" value="${settings[key]}">
-                </label>
-            `).join('')}
-            ${textInputs.map(([key, label]) => `
-                <label class="setting-number">
-                    <span>${label}</span>
-                    <input type="text" data-setting-key="${key}" value="${settings[key] || ''}">
-                </label>
-            `).join('')}
-        </div>
-        <div class="settings-actions">
-            <button class="button" id="save-settings-button" type="button">Guardar cambios</button>
-        </div>
-    `;
-
-    document.getElementById('save-settings-button').addEventListener('click', saveSettings);
 }
 
 async function saveSettings() {
     if (!state.guildDetail) return;
 
-    const saveButton = document.getElementById('save-settings-button');
-    saveButton.disabled = true;
-    saveButton.textContent = 'Guardando...';
-
+    const form = document.getElementById('settings-form');
+    const formData = new FormData(form);
     const payload = {};
-    for (const input of settingsForm.querySelectorAll('[data-setting-key]')) {
-        if (input.type === 'checkbox') {
-            payload[input.dataset.settingKey] = input.checked ? 1 : 0;
-        } else if (input.type === 'number') {
-            payload[input.dataset.settingKey] = Number(input.value);
+
+    for (const [key, value] of formData.entries()) {
+        if (form.querySelector(`[name="${key}"]`).type === 'checkbox') {
+            payload[key] = 1;
+        } else if (form.querySelector(`[name="${key}"]`).type === 'number') {
+            payload[key] = Number(value);
         } else {
-            payload[input.dataset.settingKey] = input.value.trim() || null;
+            payload[key] = value || null;
         }
     }
 
     try {
-        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/settings`, {
+        await fetch(`/api/guilds/${state.guildDetail.guild.id}/settings`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-
-        // Clear cache for this guild
-        apiCache.delete(`/api/guilds/${state.guildDetail.guild.id}`);
         
-        flashBanner('Configuracion actualizada correctamente.', 'success');
-        await loadGuild(state.guildDetail.guild.id);
+        showMessage('Configuración guardada', 'success');
     } catch (error) {
-        flashBanner(error.message, 'error');
-    } finally {
-        saveButton.disabled = false;
-        saveButton.textContent = 'Guardar cambios';
+        showMessage('Error al guardar', 'error');
     }
 }
 
-async function handleSimpleCreate(event, section, inputId, successMessage) {
-    event.preventDefault();
-    if (!state.guildDetail) return;
-
-    const input = document.getElementById(inputId);
-    const userId = input.value.trim();
-    if (!userId) return;
-
-    const form = input.closest('form');
-    const button = form.querySelector('button');
-    button.disabled = true;
-    button.textContent = 'Agregando...';
-
-    try {
-        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/${section}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId })
-        });
-
-        input.value = '';
-        
-        // Clear cache for this guild
-        apiCache.delete(`/api/guilds/${state.guildDetail.guild.id}`);
-        
-        flashBanner(successMessage, 'success');
-        await loadGuild(state.guildDetail.guild.id);
-    } catch (error) {
-        flashBanner(error.message, 'error');
-    } finally {
-        button.disabled = false;
-        button.textContent = 'Agregar';
-    }
-}
-
-async function removeEntry(section, userId) {
+async function removeItem(type, id) {
     if (!state.guildDetail) return;
 
     try {
-        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/${section}/${userId}`, {
+        await fetch(`/api/guilds/${state.guildDetail.guild.id}/${type}/${id}`, {
             method: 'DELETE'
         });
-
-        // Clear cache for this guild
-        apiCache.delete(`/api/guilds/${state.guildDetail.guild.id}`);
         
-        flashBanner('Elemento eliminado correctamente.', 'success');
         await loadGuild(state.guildDetail.guild.id);
+        showMessage('Eliminado correctamente', 'success');
     } catch (error) {
-        flashBanner(error.message, 'error');
+        showMessage('Error al eliminar', 'error');
     }
 }
 
-function stackItemWithRemove(id, label, removable, handler) {
-    return `
-        <div class="stack-item stack-item-action">
-            <div>
-                <strong>${escapeHtml(label)}</strong>
-                <small>${escapeHtml(id)}</small>
-            </div>
-            ${removable ? `<button class="button button-danger js-remove" data-id="${escapeHtml(id)}" type="button">Quitar</button>` : ''}
-        </div>
-    `;
+function showPage(page) {
+    landingPage.classList.add('hidden');
+    dashboardPage.classList.add('hidden');
+    guildPage.classList.add('hidden');
+
+    if (page === 'landing') landingPage.classList.remove('hidden');
+    if (page === 'dashboard') dashboardPage.classList.remove('hidden');
+    if (page === 'guild') guildPage.classList.remove('hidden');
 }
 
-function bindActionButtons(container) {
-    const buttons = container.querySelectorAll('.js-remove');
-    for (const button of buttons) {
-        const clone = button.cloneNode(true);
-        clone.addEventListener('click', () => {
-            const label = container.id;
-            const section = label.replace('-list', '');
-            removeEntry(section, clone.dataset.id);
-        });
-        button.replaceWith(clone);
-    }
-}
-
-function emptyStack(title) {
-    return `<div class="stack-item"><strong>${title}</strong><small>No hay elementos registrados.</small></div>`;
-}
-
-async function fetchJson(url, options = {}) {
-    const cacheKey = `${url}_${JSON.stringify(options)}`;
-    
-    // Check cache for GET requests
-    if (!options.method || options.method === 'GET') {
-        const cached = apiCache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-            return cached.data;
-        }
-    }
-    
-    const response = await fetch(url, options);
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Network error' }));
-        throw new Error(error.error || error.message || 'Error en la peticion');
-    }
-    const data = await response.json();
-    
-    // Cache GET requests
-    if (!options.method || options.method === 'GET') {
-        apiCache.set(cacheKey, { data, timestamp: Date.now() });
-    }
-    
-    return data;
-}
-
-function parseGuildIdFromPath() {
-    const match = window.location.pathname.match(/^\/dashboard\/(\d+)$/);
-    return match ? match[1] : null;
-}
-
-function showLoadingState() {
-    document.body.style.cursor = 'wait';
-}
-
-function hideLoadingState() {
-    document.body.style.cursor = 'default';
-}
-
-function flashBanner(message, kind = 'info') {
-    authBanner.textContent = message;
-    authBanner.className = `auth-banner ${kind}`;
-    authBanner.classList.remove('hidden');
-    authBanner.style.animation = 'none';
-    authBanner.offsetHeight;
-    authBanner.style.animation = 'float-in 0.3s ease both';
+function showMessage(text, type = 'success') {
+    message.textContent = text;
+    message.className = `message ${type}`;
+    message.classList.remove('hidden');
     
     setTimeout(() => {
-        authBanner.classList.add('hidden');
-    }, 5000);
+        message.classList.add('hidden');
+    }, 3000);
 }
 
-function formatNumber(number) {
-    return new Intl.NumberFormat('es-ES').format(number || 0);
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
+function formatKey(key) {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
+
+document.addEventListener('DOMContentLoaded', init);
