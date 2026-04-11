@@ -46,6 +46,7 @@ async function init() {
 
         if (path === '/') {
             showPage('landing');
+            await loadStats();
         } else if (path.startsWith('/dashboard/')) {
             const guildId = path.split('/')[2];
             await loadGuild(guildId);
@@ -56,6 +57,28 @@ async function init() {
     } catch (error) {
         console.error('Init error:', error);
         if (message) showMessage('Error al cargar el dashboard', 'error');
+    }
+}
+
+async function loadStats() {
+    try {
+        const response = await fetch('/api/overview');
+        const data = await response.json();
+
+        const statServers = document.getElementById('stat-servers');
+        const statMembers = document.getElementById('stat-members');
+        const statEvents = document.getElementById('stat-events');
+        const statUptime = document.getElementById('stat-uptime');
+
+        if (statServers) statServers.textContent = data.stats.totalGuilds || 0;
+        if (statMembers) statMembers.textContent = formatNumber(data.stats.totalMembers || 0);
+        if (statEvents) {
+            const totalEvents = data.eventCounts.reduce((sum, item) => sum + item.total, 0);
+            statEvents.textContent = totalEvents || 0;
+        }
+        if (statUptime) statUptime.textContent = (data.stats.uptimeHours || 0) + 'h';
+    } catch (error) {
+        console.error('Error loading stats:', error);
     }
 }
 
@@ -217,18 +240,44 @@ async function saveSettings() {
     if (!state.guildDetail) return;
 
     const form = document.getElementById('settings-form');
-    const formData = new FormData(form);
     const payload = {};
 
-    for (const [key, value] of formData.entries()) {
-        if (form.querySelector(`[name="${key}"]`).type === 'checkbox') {
-            payload[key] = 1;
-        } else if (form.querySelector(`[name="${key}"]`).type === 'number') {
-            payload[key] = Number(value);
-        } else {
-            payload[key] = value || null;
+    // Get all checkbox values (both checked and unchecked)
+    const toggles = [
+        'anti_raid', 'anti_nuke', 'anti_flood', 'anti_bots',
+        'anti_alts', 'anti_links', 'anti_mentions', 'anti_bot_verified_only', 'lockdown_active'
+    ];
+
+    toggles.forEach(key => {
+        const checkbox = form.querySelector(`input[name="${key}"]`);
+        if (checkbox) {
+            payload[key] = checkbox.checked ? 1 : 0;
         }
-    }
+    });
+
+    // Get number and text inputs
+    const numbers = [
+        'max_joins_per_minute', 'max_messages_per_second',
+        'max_mentions_per_message', 'min_account_age_days'
+    ];
+
+    numbers.forEach(key => {
+        const input = form.querySelector(`input[name="${key}"]`);
+        if (input) {
+            payload[key] = Number(input.value);
+        }
+    });
+
+    const texts = [
+        'log_channel', 'alert_channel', 'welcome_channel', 'verification_role'
+    ];
+
+    texts.forEach(key => {
+        const input = form.querySelector(`input[name="${key}"]`);
+        if (input) {
+            payload[key] = input.value.trim() || null;
+        }
+    });
 
     try {
         await fetch(`/api/guilds/${state.guildDetail.guild.id}/settings`, {
@@ -236,7 +285,7 @@ async function saveSettings() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        
+
         showMessage('Configuración guardada', 'success');
     } catch (error) {
         showMessage('Error al guardar', 'error');
@@ -293,6 +342,12 @@ function escapeHtml(text) {
 
 function formatKey(key) {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
 }
 
 document.addEventListener('DOMContentLoaded', init);
