@@ -5,6 +5,7 @@ require('dotenv').config();
 
 const { ensureWeeklyBackups } = require('./utils/security');
 const Database = require('./utils/database');
+const { createWebServer } = require('./web/server');
 
 const client = new Client({
     intents: [
@@ -92,10 +93,7 @@ process.on('uncaughtException', (error) => {
 
 const port = Number(process.env.PORT) || 3000;
 http
-    .createServer((req, res) => {
-        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Ghostly Guard is running');
-    })
+    .createServer(createWebServer(client))
     .listen(port, '0.0.0.0', () => {
         console.log(`HTTP listo en el puerto ${port}`);
     });

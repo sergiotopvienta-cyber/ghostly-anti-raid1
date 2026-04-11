@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ghostly Guard | Anti-Raid Control Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="topbar">
+            <a class="brand" href="#top">
+                <span class="brand-mark">G</span>
+                <span>Ghostly Guard</span>
+            </a>
+            <nav class="nav">
+                <a href="#features">Proteccion</a>
+                <a href="#dashboard">Dashboard</a>
+                <a href="#servers">Servidores</a>
+            </nav>
+            <a class="button button-ghost" href="#dashboard">Abrir panel</a>
+        </header>
+
+        <main>
+            <section class="hero" id="top">
+                <div class="hero-copy">
+                    <p class="eyebrow">ANTI-RAID PLATFORM</p>
+                    <h1>Proteccion elegante para servidores que no pueden fallar.</h1>
+                    <p class="hero-text">
+                        Ghostly Guard une anti-raid, anti-nuke, backups, bloqueo de bots no autorizados y monitoreo de incidentes
+                        en una sola superficie visual lista para Railway.
+                    </p>
+                    <div class="hero-actions">
+                        <a class="button" href="#dashboard">Ver dashboard</a>
+                        <a class="button button-secondary" id="invite-link" target="_blank" rel="noreferrer">Anadir bot</a>
+                    </div>
+                    <div class="hero-stats" id="hero-stats">
+                        <article><span class="stat-value">--</span><span class="stat-label">Servidores</span></article>
+                        <article><span class="stat-value">--</span><span class="stat-label">Miembros</span></article>
+                        <article><span class="stat-value">--</span><span class="stat-label">Eventos</span></article>
+                    </div>
+                </div>
+                <div class="hero-panel">
+                    <div class="status-strip">
+                        <span class="status-dot"></span>
+                        <span>Shield matrix online</span>
+                    </div>
+                    <div class="metric-grid" id="overview-cards"></div>
+                </div>
+            </section>
+
+            <section class="feature-band" id="features">
+                <article>
+                    <h3>Raid Response</h3>
+                    <p>Detecta joins anormales, activa lockdown y alerta a owners al instante.</p>
+                </article>
+                <article>
+                    <h3>Nuke Recovery</h3>
+                    <p>Restaura canales y roles borrados mientras registra auditoria y acciones.</p>
+                </article>
+                <article>
+                    <h3>Weekly Backups</h3>
+                    <p>Snapshots automaticos del servidor para no depender de la memoria del staff.</p>
+                </article>
+            </section>
+
+            <section class="dashboard-section" id="dashboard">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">LIVE DASHBOARD</p>
+                        <h2>Centro de control</h2>
+                    </div>
+                    <p class="section-copy">
+                        Vista centralizada de incidentes, modulos activos, backups recientes y listas de confianza.
+                    </p>
+                </div>
+
+                <div class="dashboard-layout">
+                    <aside class="server-list-card">
+                        <div class="card-header">
+                            <h3>Servidores conectados</h3>
+                            <span id="server-count">0</span>
+                        </div>
+                        <div id="server-list" class="server-list"></div>
+                    </aside>
+
+                    <section class="dashboard-main">
+                        <div class="summary-grid" id="guild-summary"></div>
+
+                        <div class="panel-grid">
+                            <article class="card">
+                                <div class="card-header">
+                                    <h3>Modulos activos</h3>
+                                </div>
+                                <div id="module-status" class="module-status"></div>
+                            </article>
+
+                            <article class="card">
+                                <div class="card-header">
+                                    <h3>Severidad de incidentes</h3>
+                                </div>
+                                <div id="severity-list" class="stack-list"></div>
+                            </article>
+
+                            <article class="card card-wide">
+                                <div class="card-header">
+                                    <h3>Actividad reciente</h3>
+                                </div>
+                                <div id="event-list" class="event-list"></div>
+                            </article>
+
+                            <article class="card">
+                                <div class="card-header">
+                                    <h3>Listas de control</h3>
+                                </div>
+                                <div id="control-lists" class="stack-list"></div>
+                            </article>
+
+                            <article class="card">
+                                <div class="card-header">
+                                    <h3>Backups</h3>
+                                </div>
+                                <div id="backup-list" class="stack-list"></div>
+                            </article>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/app.js" defer></script>
+</body>
+</html>

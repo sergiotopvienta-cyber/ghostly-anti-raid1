@@ -340,6 +340,41 @@ class Database {
         });
     }
 
+    getGlobalRecentSecurityEvents(limit = 20) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT * FROM security_events
+                 ORDER BY created_at DESC
+                 LIMIT ?`,
+                [limit],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows);
+                    }
+                }
+            );
+        });
+    }
+
+    getSecurityEventCounts(guildId = null) {
+        const query = guildId
+            ? `SELECT severity, COUNT(*) AS total FROM security_events WHERE guild_id = ? GROUP BY severity`
+            : `SELECT severity, COUNT(*) AS total FROM security_events GROUP BY severity`;
+        const params = guildId ? [guildId] : [];
+
+        return new Promise((resolve, reject) => {
+            this.db.all(query, params, (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+    }
+
     addTrustedUser(guildId, userId, type, addedBy = null) {
         return new Promise((resolve, reject) => {
             this.db.run(
