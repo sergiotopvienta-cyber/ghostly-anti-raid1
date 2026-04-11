@@ -5,6 +5,10 @@ const state = {
     guildDetail: null
 };
 
+// Simple cache for API responses
+const apiCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 const heroStats = document.getElementById('hero-stats');
 const overviewCards = document.getElementById('overview-cards');
 const inviteLink = document.getElementById('invite-link');
@@ -96,16 +100,15 @@ async function init() {
         loginButton.classList.add('hidden');
         logoutButton.classList.remove('hidden');
 
-        const [overview, guildsResponse] = await Promise.all([
-            fetchJson('/api/overview'),
-            fetchJson('/api/guilds')
-        ]);
-
+        // Load overview first for faster initial render
+        const overview = await fetchJson('/api/overview');
         state.overview = overview;
-        state.guilds = guildsResponse.guilds;
-
         renderOverview();
         renderUserChip();
+
+        // Load guilds in background
+        const guildsResponse = await fetchJson('/api/guilds');
+        state.guilds = guildsResponse.guilds;
 
         const guildIdFromPath = parseGuildIdFromPath();
         if (guildIdFromPath) {
@@ -211,8 +214,12 @@ async function loadGuild(guildId) {
     try {
         state.guildDetail = await fetchJson(`/api/guilds/${guildId}`);
         history.replaceState({}, '', `/dashboard/${guildId}`);
-        renderGuildView();
-        hideLoadingState();
+        
+        // Render immediately for faster perceived performance
+        requestAnimationFrame(() => {
+            renderGuildView();
+            hideLoadingState();
+        });
     } catch (error) {
         flashBanner('No tienes acceso a ese servidor o no existe en el bot.', 'error');
         history.replaceState({}, '', '/dashboard');
@@ -377,6 +384,9 @@ async function saveSettings() {
             body: JSON.stringify(payload)
         });
 
+        // Clear cache for this guild
+        apiCache.delete(`/api/guilds/${state.guildDetail.guild.id}`);
+        
         flashBanner('Configuracion actualizada correctamente.', 'success');
         await loadGuild(state.guildDetail.guild.id);
     } catch (error) {
@@ -408,6 +418,10 @@ async function handleSimpleCreate(event, section, inputId, successMessage) {
         });
 
         input.value = '';
+        
+        // Clear cache for this guild
+        apiCache.delete(`/api/guilds/${state.guildDetail.guild.id}`);
+        
         flashBanner(successMessage, 'success');
         await loadGuild(state.guildDetail.guild.id);
     } catch (error) {
@@ -426,6 +440,9 @@ async function removeEntry(section, userId) {
             method: 'DELETE'
         });
 
+        // Clear cache for this guild
+        apiCache.delete(`/api/guilds/${state.guildDetail.guild.id}`);
+        
         flashBanner('Elemento eliminado correctamente.', 'success');
         await loadGuild(state.guildDetail.guild.id);
     } catch (error) {
@@ -463,15 +480,29 @@ function emptyStack(title) {
 }
 
 async function fetchJson(url, options = {}) {
-    const response = await fetch(url, options);
-    const contentType = response.headers.get('content-type') || '';
-    const payload = contentType.includes('application/json') ? await response.json() : null;
-
-    if (!response.ok) {
-        throw new Error(payload?.error || `HTTP ${response.status}`);
+    const cacheKey = `${url}_${JSON.stringify(options)}`;
+    
+    // Check cache for GET requests
+    if (!options.method || options.method === 'GET') {
+        const cached = apiCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            return cached.data;
+        }
     }
-
-    return payload;
+    
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Network error' }));
+        throw new Error(error.error || error.message || 'Error en la peticion');
+    }
+    const data = await response.json();
+    
+    // Cache GET requests
+    if (!options.method || options.method === 'GET') {
+        apiCache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+    
+    return data;
 }
 
 function parseGuildIdFromPath() {

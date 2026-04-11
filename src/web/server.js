@@ -34,7 +34,8 @@ function createWebServer(client) {
             return handleApiRequest(client, req, res, requestUrl);
         }
 
-        if (requestUrl.pathname.startsWith('/dashboard')) {
+        // Serve index.html for root, dashboard, and any other routes (SPA routing)
+        if (requestUrl.pathname === '/' || requestUrl.pathname.startsWith('/dashboard') || !requestUrl.pathname.includes('.')) {
             return serveStatic('/index.html', res);
         }
 
