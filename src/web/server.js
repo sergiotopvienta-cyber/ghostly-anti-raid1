@@ -7,12 +7,6 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const SESSION_COOKIE = 'ghostly_session';
 const OAUTH_STATE_COOKIE = 'ghostly_oauth_state';
 const SESSION_TTL = 1000 * 60 * 60 * 24 * 7;
-const SUPER_ADMIN_IDS = new Set(
-    (process.env.DASHBOARD_SUPERADMIN_IDS || '1316235342268862536')
-        .split(',')
-        .map((id) => id.trim())
-        .filter(Boolean)
-);
 
 const sessions = new Map();
 
@@ -40,6 +34,10 @@ function createWebServer(client) {
             return handleApiRequest(client, req, res, requestUrl);
         }
 
+        if (requestUrl.pathname.startsWith('/dashboard')) {
+            return serveStatic('/index.html', res);
+        }
+
         return serveStatic(requestUrl.pathname, res);
     };
 }
@@ -56,6 +54,7 @@ async function handleAuthRequest(client, req, res, requestUrl) {
         oauthUrl.searchParams.set('scope', 'identify');
         oauthUrl.searchParams.set('redirect_uri', redirectUri);
         oauthUrl.searchParams.set('state', state);
+
         setCookie(res, OAUTH_STATE_COOKIE, state, {
             maxAge: 60 * 10,
             httpOnly: true
@@ -71,7 +70,7 @@ async function handleAuthRequest(client, req, res, requestUrl) {
         const code = requestUrl.searchParams.get('code');
 
         if (!code || !incomingState || incomingState !== savedState) {
-            return redirectWithMessage(res, '/?auth=failed');
+            return redirect(res, '/?auth=failed');
         }
 
         try {
@@ -91,7 +90,7 @@ async function handleAuthRequest(client, req, res, requestUrl) {
             if (!tokenResponse.ok) {
                 const errorText = await tokenResponse.text();
                 console.error('OAuth token error:', errorText);
-                return redirectWithMessage(res, '/?auth=failed');
+                return redirect(res, '/?auth=failed');
             }
 
             const tokenData = await tokenResponse.json();
@@ -100,12 +99,11 @@ async function handleAuthRequest(client, req, res, requestUrl) {
             });
 
             if (!userResponse.ok) {
-                return redirectWithMessage(res, '/?auth=failed');
+                return redirect(res, '/?auth=failed');
             }
 
             const user = await userResponse.json();
             const sessionId = crypto.randomBytes(24).toString('hex');
-
             sessions.set(sessionId, {
                 id: sessionId,
                 user,
@@ -119,22 +117,21 @@ async function handleAuthRequest(client, req, res, requestUrl) {
             });
             clearCookie(res, OAUTH_STATE_COOKIE);
 
-            return redirectWithMessage(res, '/?auth=success');
+            return redirect(res, '/dashboard?auth=success');
         } catch (error) {
             console.error('OAuth callback error:', error);
-            return redirectWithMessage(res, '/?auth=failed');
+            return redirect(res, '/?auth=failed');
         }
     }
 
     if (requestUrl.pathname === '/auth/logout') {
-        const cookies = parseCookies(req);
-        const sessionId = cookies[SESSION_COOKIE];
+        const sessionId = parseCookies(req)[SESSION_COOKIE];
         if (sessionId) {
             sessions.delete(sessionId);
         }
 
         clearCookie(res, SESSION_COOKIE);
-        return redirectWithMessage(res, '/?auth=logout');
+        return redirect(res, '/?auth=logout');
     }
 
     return sendJson(res, 404, { error: 'Ruta auth no encontrada' });
@@ -154,15 +151,14 @@ async function handleApiRequest(client, req, res, requestUrl) {
 
         if (requestUrl.pathname === '/api/session') {
             if (!session) {
-                return sendJson(res, 200, { authenticated: false, user: null });
+                return sendJson(res, 200, { authenticated: false, user: null, guilds: [] });
             }
 
-            const allowedGuilds = await buildAllowedGuildList(client, session.user.id);
+            const guilds = await buildAllowedGuildList(client, session.user.id);
             return sendJson(res, 200, {
                 authenticated: true,
                 user: decorateUser(session.user),
-                allowedGuilds,
-                isSuperAdmin: SUPER_ADMIN_IDS.has(session.user.id)
+                guilds
             });
         }
 
@@ -171,18 +167,16 @@ async function handleApiRequest(client, req, res, requestUrl) {
         }
 
         if (requestUrl.pathname === '/api/overview') {
-            const payload = await buildOverviewPayload(client, session.user.id);
-            return sendJson(res, 200, payload);
+            return sendJson(res, 200, await buildOverviewPayload(client, session.user.id));
         }
 
         if (requestUrl.pathname === '/api/guilds') {
-            const guilds = await buildAllowedGuildList(client, session.user.id);
-            return sendJson(res, 200, { guilds });
+            return sendJson(res, 200, { guilds: await buildAllowedGuildList(client, session.user.id) });
         }
 
-        const guildMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)$/);
-        if (guildMatch) {
-            const guildId = guildMatch[1];
+        const guildDetailMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)$/);
+        if (guildDetailMatch) {
+            const guildId = guildDetailMatch[1];
             const payload = await buildGuildDetail(client, guildId, session.user.id);
             if (!payload) {
                 return sendJson(res, 404, { error: 'Guild no encontrada o sin acceso' });
@@ -190,34 +184,85 @@ async function handleApiRequest(client, req, res, requestUrl) {
             return sendJson(res, 200, payload);
         }
 
-        const ownerAddMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/owners$/);
-        if (ownerAddMatch && req.method === 'POST') {
-            const guildId = ownerAddMatch[1];
-            const allowed = await canManageOwners(client, guildId, session.user.id);
-            if (!allowed) {
-                return sendJson(res, 403, { error: 'No tienes permiso para gestionar owners' });
+        const settingsMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/settings$/);
+        if (settingsMatch && req.method === 'PATCH') {
+            const guildId = settingsMatch[1];
+            const guild = await requireGuildAccess(client, guildId, session.user.id);
+            if (!guild) {
+                return sendJson(res, 403, { error: 'Sin acceso a este servidor' });
             }
 
             const body = await readJsonBody(req);
-            if (!body.userId) {
-                return sendJson(res, 400, { error: 'Falta userId' });
+            const allowedKeys = new Set([
+                'anti_raid',
+                'anti_nuke',
+                'anti_flood',
+                'anti_bots',
+                'anti_alts',
+                'anti_links',
+                'anti_mentions',
+                'anti_bot_verified_only',
+                'lockdown_active',
+                'max_joins_per_minute',
+                'max_messages_per_second',
+                'max_mentions_per_message',
+                'min_account_age_days',
+                'log_channel',
+                'alert_channel',
+                'welcome_channel',
+                'verification_role'
+            ]);
+
+            const updates = {};
+            for (const [key, value] of Object.entries(body)) {
+                if (allowedKeys.has(key)) {
+                    updates[key] = value;
+                }
             }
 
-            await client.db.addTrustedUser(guildId, body.userId, 'owner', session.user.id);
+            await client.db.updateGuildSettings(guild.id, updates);
             return sendJson(res, 200, { ok: true });
         }
 
-        const ownerDeleteMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/owners\/(\d+)$/);
-        if (ownerDeleteMatch && req.method === 'DELETE') {
-            const guildId = ownerDeleteMatch[1];
-            const targetUserId = ownerDeleteMatch[2];
-            const allowed = await canManageOwners(client, guildId, session.user.id);
-            if (!allowed) {
-                return sendJson(res, 403, { error: 'No tienes permiso para gestionar owners' });
+        const listMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/(whitelist|bots|bans|owners)$/);
+        if (listMatch) {
+            const guildId = listMatch[1];
+            const section = listMatch[2];
+            const guild = await requireGuildAccess(client, guildId, session.user.id);
+            if (!guild) {
+                return sendJson(res, 403, { error: 'Sin acceso a este servidor' });
             }
 
-            await client.db.removeTrustedUser(guildId, targetUserId, 'owner');
-            return sendJson(res, 200, { ok: true });
+            if (req.method === 'POST') {
+                const body = await readJsonBody(req);
+                return handleSectionCreate(client, guild, session.user.id, section, body, res);
+            }
+        }
+
+        const sectionDeleteMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/(whitelist|bots|bans|owners)\/(\d+)$/);
+        if (sectionDeleteMatch && req.method === 'DELETE') {
+            const guildId = sectionDeleteMatch[1];
+            const section = sectionDeleteMatch[2];
+            const targetId = sectionDeleteMatch[3];
+            const guild = await requireGuildAccess(client, guildId, session.user.id);
+            if (!guild) {
+                return sendJson(res, 403, { error: 'Sin acceso a este servidor' });
+            }
+
+            return handleSectionDelete(client, guild, session.user.id, section, targetId, res);
+        }
+
+        const backupMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/backups$/);
+        if (backupMatch && req.method === 'POST') {
+            const guildId = backupMatch[1];
+            const guild = await requireGuildAccess(client, guildId, session.user.id);
+            if (!guild) {
+                return sendJson(res, 403, { error: 'Sin acceso a este servidor' });
+            }
+
+            const { createGuildBackup } = require('../utils/security');
+            const filePath = await createGuildBackup(client, guild, 'manual', session.user.id);
+            return sendJson(res, 200, { ok: true, filePath });
         }
 
         return sendJson(res, 404, { error: 'Ruta no encontrada' });
@@ -225,6 +270,84 @@ async function handleApiRequest(client, req, res, requestUrl) {
         console.error('Error en API web:', error);
         return sendJson(res, 500, { error: 'Error interno del dashboard' });
     }
+}
+
+async function handleSectionCreate(client, guild, viewerUserId, section, body, res) {
+    if (section === 'owners') {
+        if (viewerUserId !== guild.ownerId) {
+            return sendJson(res, 403, { error: 'Solo el owner real puede gestionar owners secundarios' });
+        }
+
+        if (!body.userId) {
+            return sendJson(res, 400, { error: 'Falta userId' });
+        }
+
+        await client.db.addTrustedUser(guild.id, body.userId, 'owner', viewerUserId);
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (section === 'whitelist') {
+        if (!body.userId) {
+            return sendJson(res, 400, { error: 'Falta userId' });
+        }
+
+        await client.db.addTrustedUser(guild.id, body.userId, 'whitelist', viewerUserId);
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (section === 'bots') {
+        if (!body.userId) {
+            return sendJson(res, 400, { error: 'Falta userId' });
+        }
+
+        await client.db.addTrustedUser(guild.id, body.userId, 'bot', viewerUserId);
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (section === 'bans') {
+        if (!body.userId) {
+            return sendJson(res, 400, { error: 'Falta userId' });
+        }
+
+        await client.db.addPermanentBan(guild.id, body.userId, body.reason || 'Ban permanente desde dashboard', viewerUserId);
+        try {
+            await guild.members.ban(body.userId, { reason: body.reason || 'Ban permanente desde dashboard' });
+        } catch (error) {
+            console.error(`No se pudo banear de inmediato a ${body.userId}:`, error.message);
+        }
+
+        return sendJson(res, 200, { ok: true });
+    }
+
+    return sendJson(res, 400, { error: 'Seccion no soportada' });
+}
+
+async function handleSectionDelete(client, guild, viewerUserId, section, targetId, res) {
+    if (section === 'owners') {
+        if (viewerUserId !== guild.ownerId) {
+            return sendJson(res, 403, { error: 'Solo el owner real puede gestionar owners secundarios' });
+        }
+
+        await client.db.removeTrustedUser(guild.id, targetId, 'owner');
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (section === 'whitelist') {
+        await client.db.removeTrustedUser(guild.id, targetId, 'whitelist');
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (section === 'bots') {
+        await client.db.removeTrustedUser(guild.id, targetId, 'bot');
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (section === 'bans') {
+        await client.db.removePermanentBan(guild.id, targetId);
+        return sendJson(res, 200, { ok: true });
+    }
+
+    return sendJson(res, 400, { error: 'Seccion no soportada' });
 }
 
 async function buildOverviewPayload(client, viewerUserId) {
@@ -316,12 +439,12 @@ async function buildGuildDetail(client, guildId, viewerUserId) {
     if (!accessLevel) return null;
 
     const settings = await client.db.getGuildSettings(guildId);
-    const recentEvents = await client.db.getRecentSecurityEvents(guildId, 12);
+    const recentEvents = await client.db.getRecentSecurityEvents(guildId, 16);
     const whitelist = await client.db.listTrustedUsers(guildId, 'whitelist');
     const owners = await client.db.listTrustedUsers(guildId, 'owner');
     const bots = await client.db.listTrustedUsers(guildId, 'bot');
     const bans = await client.db.listPermanentBans(guildId);
-    const backups = await client.db.listBackups(guildId, 6);
+    const backups = await client.db.listBackups(guildId, 8);
     const severities = await client.db.getSecurityEventCounts(guildId);
 
     return {
@@ -365,25 +488,22 @@ async function getAllowedGuilds(client, viewerUserId) {
     return allowed;
 }
 
+async function requireGuildAccess(client, guildId, viewerUserId) {
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) return null;
+    const access = await getGuildAccessLevel(client, guild, viewerUserId);
+    return access ? guild : null;
+}
+
 async function getGuildAccessLevel(client, guild, viewerUserId) {
     if (!viewerUserId) return null;
-    if (SUPER_ADMIN_IDS.has(viewerUserId)) return 'super_admin';
     if (viewerUserId === guild.ownerId) return 'owner';
     if (await client.db.isTrustedUser(guild.id, viewerUserId, 'owner')) return 'secondary_owner';
     return null;
 }
 
-async function canManageOwners(client, guildId, viewerUserId) {
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) return false;
-
-    const access = await getGuildAccessLevel(client, guild, viewerUserId);
-    return access === 'super_admin' || access === 'owner';
-}
-
 function getSession(req) {
-    const cookies = parseCookies(req);
-    const sessionId = cookies[SESSION_COOKIE];
+    const sessionId = parseCookies(req)[SESSION_COOKIE];
     if (!sessionId) return null;
 
     const session = sessions.get(sessionId);
@@ -454,7 +574,6 @@ function setCookie(res, name, value, options = {}) {
     if (options.maxAge) parts.push(`Max-Age=${options.maxAge}`);
     if (options.httpOnly) parts.push('HttpOnly');
     if (process.env.NODE_ENV === 'production') parts.push('Secure');
-
     appendSetCookie(res, parts.join('; '));
 }
 
@@ -479,7 +598,7 @@ function getOrigin(req) {
     return `${proto}://${host}`;
 }
 
-function redirectWithMessage(res, location) {
+function redirect(res, location) {
     res.writeHead(302, { Location: location });
     res.end();
 }

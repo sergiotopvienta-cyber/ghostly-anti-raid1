@@ -2,57 +2,83 @@ const state = {
     session: null,
     overview: null,
     guilds: [],
-    selectedGuildId: null,
-    selectedDetail: null
+    guildDetail: null
 };
 
 const heroStats = document.getElementById('hero-stats');
 const overviewCards = document.getElementById('overview-cards');
-const serverList = document.getElementById('server-list');
-const serverCount = document.getElementById('server-count');
-const guildSummary = document.getElementById('guild-summary');
-const moduleStatus = document.getElementById('module-status');
-const severityList = document.getElementById('severity-list');
-const eventList = document.getElementById('event-list');
-const controlLists = document.getElementById('control-lists');
-const backupList = document.getElementById('backup-list');
-const ownersList = document.getElementById('owners-list');
 const inviteLink = document.getElementById('invite-link');
 const loginButton = document.getElementById('login-button');
 const logoutButton = document.getElementById('logout-button');
-const dashboardLocked = document.getElementById('dashboard-locked');
-const dashboardApp = document.getElementById('dashboard-app');
 const authBanner = document.getElementById('auth-banner');
+const dashboardLocked = document.getElementById('dashboard-locked');
+const serverHub = document.getElementById('server-hub');
+const guildView = document.getElementById('guild-view');
 const dashboardUser = document.getElementById('dashboard-user');
+const serverGrid = document.getElementById('server-grid');
+const guildTitle = document.getElementById('guild-title');
+const guildSummary = document.getElementById('guild-summary');
+const settingsForm = document.getElementById('settings-form');
+const ownersList = document.getElementById('owners-list');
+const whitelistList = document.getElementById('whitelist-list');
+const botsList = document.getElementById('bots-list');
+const bansList = document.getElementById('bans-list');
+const backupList = document.getElementById('backup-list');
+const severityList = document.getElementById('severity-list');
+const eventList = document.getElementById('event-list');
 const ownerForm = document.getElementById('owner-form');
-const ownerIdInput = document.getElementById('owner-id-input');
+const whitelistForm = document.getElementById('whitelist-form');
+const botForm = document.getElementById('bot-form');
+const banForm = document.getElementById('ban-form');
+const manualBackupButton = document.getElementById('manual-backup-button');
 
 logoutButton.addEventListener('click', () => {
     window.location.href = '/auth/logout';
 });
 
-ownerForm.addEventListener('submit', async (event) => {
+ownerForm.addEventListener('submit', (event) => handleSimpleCreate(event, 'owners', 'owner-id-input', 'Owner secundario agregado.'));
+whitelistForm.addEventListener('submit', (event) => handleSimpleCreate(event, 'whitelist', 'whitelist-id-input', 'Usuario agregado a whitelist.'));
+botForm.addEventListener('submit', (event) => handleSimpleCreate(event, 'bots', 'bot-id-input', 'Bot autorizado agregado.'));
+
+banForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!state.selectedGuildId || !ownerIdInput.value.trim()) return;
+    if (!state.guildDetail) return;
+
+    const userId = document.getElementById('ban-id-input').value.trim();
+    const reason = document.getElementById('ban-reason-input').value.trim();
+    if (!userId) return;
 
     try {
-        await fetchJson(`/api/guilds/${state.selectedGuildId}/owners`, {
+        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/bans`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: ownerIdInput.value.trim() })
+            body: JSON.stringify({ userId, reason })
         });
 
-        ownerIdInput.value = '';
-        await loadGuild(state.selectedGuildId);
-        flashBanner('Owner secundario agregado correctamente.', 'success');
+        document.getElementById('ban-id-input').value = '';
+        document.getElementById('ban-reason-input').value = '';
+        flashBanner('Ban permanente agregado.', 'success');
+        await loadGuild(state.guildDetail.guild.id);
     } catch (error) {
-        flashBanner('No se pudo agregar ese owner secundario.', 'error');
+        flashBanner(error.message, 'error');
+    }
+});
+
+manualBackupButton.addEventListener('click', async () => {
+    if (!state.guildDetail) return;
+
+    try {
+        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/backups`, { method: 'POST' });
+        flashBanner('Backup creado correctamente.', 'success');
+        await loadGuild(state.guildDetail.guild.id);
+    } catch (error) {
+        flashBanner(error.message, 'error');
     }
 });
 
 init().catch((error) => {
-    console.error('Error cargando dashboard:', error);
-    flashBanner('Hubo un error cargando el dashboard.', 'error');
+    console.error('Dashboard bootstrap error:', error);
+    flashBanner('No se pudo cargar la aplicacion.', 'error');
 });
 
 async function init() {
@@ -63,58 +89,44 @@ async function init() {
         return;
     }
 
-    const [overview, guilds] = await Promise.all([
+    loginButton.classList.add('hidden');
+    logoutButton.classList.remove('hidden');
+
+    const [overview, guildsResponse] = await Promise.all([
         fetchJson('/api/overview'),
         fetchJson('/api/guilds')
     ]);
 
     state.overview = overview;
-    state.guilds = guilds.guilds;
-    state.selectedGuildId = state.guilds[0]?.id || null;
+    state.guilds = guildsResponse.guilds;
 
     renderOverview();
-    renderAuthenticatedState();
-    renderGuildList();
+    renderUserChip();
 
-    if (state.selectedGuildId) {
-        await loadGuild(state.selectedGuildId);
+    const guildIdFromPath = parseGuildIdFromPath();
+    if (guildIdFromPath) {
+        await loadGuild(guildIdFromPath);
+        return;
     }
-}
 
-async function loadGuild(guildId) {
-    state.selectedGuildId = guildId;
-    renderGuildList();
-    dashboardApp.classList.add('is-loading');
-
-    try {
-        state.selectedDetail = await fetchJson(`/api/guilds/${guildId}`);
-        renderGuildDetail(state.selectedDetail);
-    } finally {
-        dashboardApp.classList.remove('is-loading');
-    }
+    renderServerHub();
 }
 
 function renderGuestState() {
-    loginButton.classList.remove('hidden');
-    logoutButton.classList.add('hidden');
     dashboardLocked.classList.remove('hidden');
-    dashboardApp.classList.add('hidden');
-    flashBanner('Inicia sesion con Discord para desbloquear el dashboard.', 'info');
+    serverHub.classList.add('hidden');
+    guildView.classList.add('hidden');
+    flashBanner('Inicia sesion con Discord para ver tus servidores.', 'info');
 }
 
-function renderAuthenticatedState() {
-    loginButton.classList.add('hidden');
-    logoutButton.classList.remove('hidden');
-    dashboardLocked.classList.add('hidden');
-    dashboardApp.classList.remove('hidden');
-
+function renderUserChip() {
     const user = state.session.user;
     dashboardUser.innerHTML = `
         <div class="user-chip">
             ${user.avatar ? `<img src="${user.avatar}" alt="${escapeHtml(user.username)}">` : '<span class="avatar-fallback">D</span>'}
             <div>
                 <strong>${escapeHtml(user.global_name || user.username)}</strong>
-                <small>${escapeHtml(user.username)} · ${state.session.isSuperAdmin ? 'Super Admin' : 'Owner Access'}</small>
+                <small>${escapeHtml(user.username)} · access panel</small>
             </div>
         </div>
     `;
@@ -137,12 +149,12 @@ function renderOverview() {
             <strong>${stats.uptimeHours}h</strong>
         </article>
         <article class="metric-card reveal-card">
-            <h3>Lockdowns activos</h3>
+            <h3>Lockdowns</h3>
             <p>Servidores protegidos</p>
             <strong>${stats.lockdownGuilds}</strong>
         </article>
         <article class="metric-card reveal-card">
-            <h3>Whitelist entries</h3>
+            <h3>Whitelist</h3>
             <p>Usuarios de confianza</p>
             <strong>${stats.whitelistEntries}</strong>
         </article>
@@ -158,52 +170,90 @@ function renderOverview() {
     }
 }
 
-function renderGuildList() {
-    serverCount.textContent = state.guilds.length;
+function renderServerHub() {
+    dashboardLocked.classList.add('hidden');
+    guildView.classList.add('hidden');
+    serverHub.classList.remove('hidden');
 
-    serverList.innerHTML = state.guilds.map((guild) => `
-        <button class="server-item ${guild.id === state.selectedGuildId ? 'active' : ''}" data-guild-id="${guild.id}">
-            <strong>${escapeHtml(guild.name)}</strong>
-            <small>${formatNumber(guild.memberCount)} miembros</small>
-            <small>${escapeHtml(guild.accessLevel.replaceAll('_', ' '))}</small>
-        </button>
-    `).join('');
+    serverGrid.innerHTML = state.guilds.length
+        ? state.guilds.map((guild) => `
+            <a class="server-card" href="/dashboard/${guild.id}">
+                <div>
+                    <strong>${escapeHtml(guild.name)}</strong>
+                    <small>${formatNumber(guild.memberCount)} miembros</small>
+                </div>
+                <div class="server-card-meta">
+                    <span class="pill ${guild.features.lockdown ? 'off' : 'on'}">${guild.features.lockdown ? 'LOCKDOWN' : 'ESTABLE'}</span>
+                    <small>${escapeHtml(guild.accessLevel.replaceAll('_', ' '))}</small>
+                </div>
+            </a>
+        `).join('')
+        : `<div class="locked-card"><h3>No tienes servidores autorizados</h3><p>Debes ser owner real o owner secundario y el bot debe estar dentro.</p></div>`;
+}
 
-    for (const button of serverList.querySelectorAll('[data-guild-id]')) {
-        button.addEventListener('click', () => loadGuild(button.dataset.guildId));
+async function loadGuild(guildId) {
+    try {
+        state.guildDetail = await fetchJson(`/api/guilds/${guildId}`);
+        history.replaceState({}, '', `/dashboard/${guildId}`);
+        renderGuildView();
+    } catch (error) {
+        flashBanner('No tienes acceso a ese servidor o no existe en el bot.', 'error');
+        history.replaceState({}, '', '/dashboard');
+        renderServerHub();
     }
 }
 
-function renderGuildDetail(detail) {
-    const { guild, settings, counts, severityCounts, recentEvents, backups, owners, accessLevel } = detail;
+function renderGuildView() {
+    const detail = state.guildDetail;
+    const { guild, settings, counts, severityCounts, recentEvents, backups, owners, whitelist, bots, bans, accessLevel } = detail;
 
+    serverHub.classList.add('hidden');
+    dashboardLocked.classList.add('hidden');
+    guildView.classList.remove('hidden');
+
+    guildTitle.textContent = guild.name;
     guildSummary.innerHTML = `
-        <article class="mini-tile">
-            <span class="mini-label">Servidor</span>
-            <span class="mini-value">${escapeHtml(guild.name)}</span>
-        </article>
-        <article class="mini-tile">
-            <span class="mini-label">Miembros</span>
-            <span class="mini-value">${formatNumber(guild.memberCount)}</span>
-        </article>
-        <article class="mini-tile">
-            <span class="mini-label">Acceso</span>
-            <span class="mini-value">${escapeHtml(accessLevel.replaceAll('_', ' '))}</span>
-        </article>
-        <article class="mini-tile">
-            <span class="mini-label">Backups</span>
-            <span class="mini-value">${counts.backups}</span>
-        </article>
+        <article class="mini-tile"><span class="mini-label">Servidor</span><span class="mini-value">${escapeHtml(guild.name)}</span></article>
+        <article class="mini-tile"><span class="mini-label">Miembros</span><span class="mini-value">${formatNumber(guild.memberCount)}</span></article>
+        <article class="mini-tile"><span class="mini-label">Acceso</span><span class="mini-value">${escapeHtml(accessLevel.replaceAll('_', ' '))}</span></article>
+        <article class="mini-tile"><span class="mini-label">Backups</span><span class="mini-value">${counts.backups}</span></article>
     `;
 
-    moduleStatus.innerHTML = [
-        pill('Anti-Raid', settings.anti_raid),
-        pill('Anti-Nuke', settings.anti_nuke),
-        pill('Anti-Flood', settings.anti_flood),
-        pill('Anti-Bots', settings.anti_bots),
-        pill('Anti-Alts', settings.anti_alts),
-        pill('Lockdown', settings.lockdown_active)
-    ].join('');
+    renderSettingsForm(settings);
+
+    const canManageOwners = accessLevel === 'owner';
+    ownerForm.classList.toggle('hidden', !canManageOwners);
+
+    ownersList.innerHTML = `
+        <div class="stack-item"><strong>Owner real</strong><small>${guild.ownerId}</small></div>
+        ${owners.map((owner) => stackItemWithRemove(owner.user_id, 'Owner secundario', canManageOwners, () => removeEntry('owners', owner.user_id))).join('')}
+    `;
+    bindActionButtons(ownersList);
+
+    whitelistList.innerHTML = whitelist.length
+        ? whitelist.map((item) => stackItemWithRemove(item.user_id, 'Whitelist', true, () => removeEntry('whitelist', item.user_id))).join('')
+        : emptyStack('Sin whitelist');
+    bindActionButtons(whitelistList);
+
+    botsList.innerHTML = bots.length
+        ? bots.map((item) => stackItemWithRemove(item.user_id, 'Bot autorizado', true, () => removeEntry('bots', item.user_id))).join('')
+        : emptyStack('Sin bots autorizados');
+    bindActionButtons(botsList);
+
+    bansList.innerHTML = bans.length
+        ? bans.map((item) => stackItemWithRemove(item.user_id, item.reason || 'Ban permanente', true, () => removeEntry('bans', item.user_id))).join('')
+        : emptyStack('Sin bans permanentes');
+    bindActionButtons(bansList);
+
+    backupList.innerHTML = backups.length
+        ? backups.map((backup) => `
+            <div class="stack-item">
+                <strong>${escapeHtml(backup.type)}</strong>
+                <small>${escapeHtml(backup.created_at)}</small>
+                <small>${escapeHtml(backup.file_path)}</small>
+            </div>
+        `).join('')
+        : emptyStack('Sin backups');
 
     severityList.innerHTML = severityCounts.length
         ? severityCounts.map((item) => `
@@ -212,7 +262,7 @@ function renderGuildDetail(detail) {
                 <small>${item.total} evento(s)</small>
             </div>
         `).join('')
-        : `<div class="stack-item"><strong>Sin incidentes</strong><small>No hay eventos registrados todavia.</small></div>`;
+        : emptyStack('Sin incidentes');
 
     eventList.innerHTML = recentEvents.length
         ? recentEvents.map((event) => `
@@ -223,60 +273,157 @@ function renderGuildDetail(detail) {
             </div>
         `).join('')
         : `<div class="event-item"><strong>Todo quieto</strong><small>No hay eventos recientes en este servidor.</small></div>`;
+}
 
-    controlLists.innerHTML = `
-        <div class="stack-item"><strong>Whitelist</strong><small>${counts.whitelist} usuario(s)</small></div>
-        <div class="stack-item"><strong>Owners secundarios</strong><small>${counts.owners} usuario(s)</small></div>
-        <div class="stack-item"><strong>Bots autorizados</strong><small>${counts.authorizedBots} bot(s)</small></div>
-        <div class="stack-item"><strong>Bans permanentes</strong><small>${counts.permanentBans} ID(s)</small></div>
-    `;
+function renderSettingsForm(settings) {
+    const toggles = [
+        ['anti_raid', 'Anti-Raid'],
+        ['anti_nuke', 'Anti-Nuke'],
+        ['anti_flood', 'Anti-Flood'],
+        ['anti_bots', 'Anti-Bots'],
+        ['anti_alts', 'Anti-Alts'],
+        ['anti_links', 'Anti-Links'],
+        ['anti_mentions', 'Anti-Mentions'],
+        ['anti_bot_verified_only', 'Solo bots verificados'],
+        ['lockdown_active', 'Lockdown']
+    ];
 
-    backupList.innerHTML = backups.length
-        ? backups.map((backup) => `
-            <div class="stack-item">
-                <strong>${escapeHtml(backup.type)}</strong>
-                <small>${escapeHtml(backup.created_at)}</small>
-                <small>${escapeHtml(backup.file_path)}</small>
-            </div>
-        `).join('')
-        : `<div class="stack-item"><strong>Sin backups</strong><small>Aun no se ha guardado ninguna copia.</small></div>`;
+    const numbers = [
+        ['max_joins_per_minute', 'Max joins/minuto'],
+        ['max_messages_per_second', 'Max mensajes/segundo'],
+        ['max_mentions_per_message', 'Max menciones/mensaje'],
+        ['min_account_age_days', 'Edad minima cuenta']
+    ];
 
-    const canManageOwners = accessLevel === 'owner' || accessLevel === 'super_admin';
-    ownerForm.classList.toggle('hidden', !canManageOwners);
+    const textInputs = [
+        ['log_channel', 'Canal de logs (ID)'],
+        ['alert_channel', 'Canal de alertas (ID)'],
+        ['welcome_channel', 'Canal de bienvenida (ID)'],
+        ['verification_role', 'Rol de verificacion (ID)']
+    ];
 
-    ownersList.innerHTML = `
-        <div class="stack-item">
-            <strong>Owner real</strong>
-            <small>${guild.ownerId}</small>
+    settingsForm.innerHTML = `
+        <div class="settings-grid">
+            ${toggles.map(([key, label]) => `
+                <label class="setting-toggle">
+                    <span>${label}</span>
+                    <input type="checkbox" data-setting-key="${key}" ${settings[key] ? 'checked' : ''}>
+                </label>
+            `).join('')}
+            ${numbers.map(([key, label]) => `
+                <label class="setting-number">
+                    <span>${label}</span>
+                    <input type="number" data-setting-key="${key}" value="${settings[key]}">
+                </label>
+            `).join('')}
+            ${textInputs.map(([key, label]) => `
+                <label class="setting-number">
+                    <span>${label}</span>
+                    <input type="text" data-setting-key="${key}" value="${settings[key] || ''}">
+                </label>
+            `).join('')}
         </div>
-        ${owners.map((owner) => `
-            <div class="stack-item stack-item-action">
-                <div>
-                    <strong>Owner secundario</strong>
-                    <small>${owner.user_id}</small>
-                </div>
-                ${canManageOwners ? `<button class="button button-danger owner-remove" data-owner-id="${owner.user_id}" type="button">Quitar</button>` : ''}
-            </div>
-        `).join('')}
+        <div class="settings-actions">
+            <button class="button" id="save-settings-button" type="button">Guardar cambios</button>
+        </div>
     `;
 
-    for (const button of ownersList.querySelectorAll('.owner-remove')) {
-        button.addEventListener('click', async () => {
-            try {
-                await fetchJson(`/api/guilds/${state.selectedGuildId}/owners/${button.dataset.ownerId}`, {
-                    method: 'DELETE'
-                });
-                await loadGuild(state.selectedGuildId);
-                flashBanner('Owner secundario eliminado correctamente.', 'success');
-            } catch (error) {
-                flashBanner('No se pudo eliminar ese owner secundario.', 'error');
-            }
+    document.getElementById('save-settings-button').addEventListener('click', saveSettings);
+}
+
+async function saveSettings() {
+    if (!state.guildDetail) return;
+
+    const payload = {};
+    for (const input of settingsForm.querySelectorAll('[data-setting-key]')) {
+        if (input.type === 'checkbox') {
+            payload[input.dataset.settingKey] = input.checked ? 1 : 0;
+        } else if (input.type === 'number') {
+            payload[input.dataset.settingKey] = Number(input.value);
+        } else {
+            payload[input.dataset.settingKey] = input.value.trim() || null;
+        }
+    }
+
+    try {
+        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/settings`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
+
+        flashBanner('Configuracion actualizada correctamente.', 'success');
+        await loadGuild(state.guildDetail.guild.id);
+    } catch (error) {
+        flashBanner(error.message, 'error');
     }
 }
 
-function pill(label, active) {
-    return `<span class="pill ${active ? 'on' : 'off'}">${label}: ${active ? 'ON' : 'OFF'}</span>`;
+async function handleSimpleCreate(event, section, inputId, successMessage) {
+    event.preventDefault();
+    if (!state.guildDetail) return;
+
+    const input = document.getElementById(inputId);
+    const userId = input.value.trim();
+    if (!userId) return;
+
+    try {
+        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/${section}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+
+        input.value = '';
+        flashBanner(successMessage, 'success');
+        await loadGuild(state.guildDetail.guild.id);
+    } catch (error) {
+        flashBanner(error.message, 'error');
+    }
+}
+
+async function removeEntry(section, userId) {
+    if (!state.guildDetail) return;
+
+    try {
+        await fetchJson(`/api/guilds/${state.guildDetail.guild.id}/${section}/${userId}`, {
+            method: 'DELETE'
+        });
+
+        flashBanner('Elemento eliminado correctamente.', 'success');
+        await loadGuild(state.guildDetail.guild.id);
+    } catch (error) {
+        flashBanner(error.message, 'error');
+    }
+}
+
+function stackItemWithRemove(id, label, removable, handler) {
+    return `
+        <div class="stack-item stack-item-action">
+            <div>
+                <strong>${escapeHtml(label)}</strong>
+                <small>${escapeHtml(id)}</small>
+            </div>
+            ${removable ? `<button class="button button-danger js-remove" data-id="${escapeHtml(id)}" type="button">Quitar</button>` : ''}
+        </div>
+    `;
+}
+
+function bindActionButtons(container) {
+    const buttons = container.querySelectorAll('.js-remove');
+    for (const button of buttons) {
+        const clone = button.cloneNode(true);
+        clone.addEventListener('click', () => {
+            const label = container.id;
+            const section = label.replace('-list', '');
+            removeEntry(section, clone.dataset.id);
+        });
+        button.replaceWith(clone);
+    }
+}
+
+function emptyStack(title) {
+    return `<div class="stack-item"><strong>${title}</strong><small>No hay elementos registrados.</small></div>`;
 }
 
 async function fetchJson(url, options = {}) {
@@ -289,6 +436,11 @@ async function fetchJson(url, options = {}) {
     }
 
     return payload;
+}
+
+function parseGuildIdFromPath() {
+    const match = window.location.pathname.match(/^\/dashboard\/(\d+)$/);
+    return match ? match[1] : null;
 }
 
 function flashBanner(message, kind = 'info') {

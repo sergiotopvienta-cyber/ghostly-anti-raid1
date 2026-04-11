@@ -49,7 +49,7 @@ module.exports = {
         }
 
         if (!bypass && settings.anti_links) {
-            const links = message.content.match(/(https?:\/\/[^\s]+)/g);
+            const links = message.content.match(/(https?:\/\/[^\s]+|discord\.gg\/[^\s]+|discord\.com\/invite\/[^\s]+)/g);
             if (links?.length) {
                 return handleTimeoutThreat(message, client, settings, {
                     type: 'LINK_BLOCKED',

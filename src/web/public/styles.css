@@ -131,6 +131,10 @@ body::before {
     margin-bottom: 64px;
 }
 
+.compact-hero {
+    margin-bottom: 42px;
+}
+
 .eyebrow {
     margin: 0 0 14px;
     color: var(--green);
@@ -330,6 +334,50 @@ body::before {
     transform: translateY(6px);
 }
 
+.server-hub,
+.guild-view {
+    animation: float-in 260ms ease both;
+}
+
+.server-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.server-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 170px;
+    padding: 22px;
+    border-radius: 26px;
+    border: 1px solid var(--stroke);
+    background: var(--panel);
+    color: var(--text);
+    text-decoration: none;
+    box-shadow: var(--shadow);
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.server-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(85, 214, 255, 0.3);
+    background: rgba(15, 35, 58, 0.95);
+}
+
+.server-card strong {
+    display: block;
+    margin-bottom: 8px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.25rem;
+}
+
+.server-card-meta {
+    display: grid;
+    gap: 8px;
+}
+
 .server-list-card,
 .card {
     padding: 22px;
@@ -465,7 +513,24 @@ body::before {
     margin-bottom: 16px;
 }
 
+.ban-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
 .owner-form input {
+    min-height: 48px;
+    padding: 0 16px;
+    border: 1px solid var(--stroke);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font: inherit;
+}
+
+.ban-form input {
     min-height: 48px;
     padding: 0 16px;
     border: 1px solid var(--stroke);
@@ -486,6 +551,52 @@ body::before {
     background: rgba(255, 93, 115, 0.12);
     border-color: rgba(255, 93, 115, 0.2);
     color: #ffd6dc;
+}
+
+.settings-form {
+    display: grid;
+    gap: 16px;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.setting-toggle,
+.setting-number {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--panel-strong);
+}
+
+.setting-toggle span,
+.setting-number span {
+    font-weight: 700;
+}
+
+.setting-toggle input,
+.setting-number input {
+    accent-color: var(--green);
+}
+
+.setting-number input {
+    min-height: 42px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--stroke);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+}
+
+.section-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .pill {
@@ -530,7 +641,9 @@ body::before {
 
     .summary-grid,
     .panel-grid,
-    .feature-band {
+    .feature-band,
+    .server-grid,
+    .settings-grid {
         grid-template-columns: 1fr 1fr;
     }
 }
@@ -548,7 +661,10 @@ body::before {
     .panel-grid,
     .feature-band,
     .metric-grid,
-    .owner-form {
+    .owner-form,
+    .ban-form,
+    .server-grid,
+    .settings-grid {
         grid-template-columns: 1fr;
         display: grid;
     }
