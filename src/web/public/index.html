@@ -17,8 +17,8 @@
                 <span>Ghostly Guard</span>
             </a>
             <nav class="nav">
-                <a href="/">Landing</a>
-                <a href="/dashboard">Tus servidores</a>
+                <a href="/">Inicio</a>
+                <a href="/dashboard">Dashboard</a>
             </nav>
             <div class="topbar-actions">
                 <button class="button button-ghost hidden" id="logout-button" type="button">Cerrar sesion</button>
@@ -29,13 +29,13 @@
         <main>
             <section class="hero compact-hero" id="landing-block">
                 <div class="hero-copy">
-                    <p class="eyebrow">OWNER-ONLY CONTROL</p>
-                    <h1>Panel privado para el owner real y owners secundarios.</h1>
+                    <p class="eyebrow">PANEL DE CONTROL</p>
+                    <h1>Gestiona tu servidor con seguridad avanzada</h1>
                     <p class="hero-text">
-                        Solo veras servidores donde el bot este dentro y tu cuenta tenga acceso valido. Nada de servidores ajenos.
+                        Solo veras servidores donde el bot este dentro y tu cuenta tenga acceso valido. Proteccion total contra raids, nukes y spam.
                     </p>
                     <div class="hero-actions">
-                        <a class="button" href="/dashboard">Ir a mis servidores</a>
+                        <a class="button" href="/dashboard">Ir al Dashboard</a>
                         <a class="button button-secondary" id="invite-link" target="_blank" rel="noreferrer">Anadir bot</a>
                     </div>
                     <div class="hero-stats" id="hero-stats">
@@ -47,7 +47,7 @@
                 <div class="hero-panel">
                     <div class="status-strip">
                         <span class="status-dot"></span>
-                        <span>Owner access enforced</span>
+                        <span>Sistema activo</span>
                     </div>
                     <div class="metric-grid" id="overview-cards"></div>
                 </div>
@@ -57,9 +57,9 @@
 
             <section class="dashboard-locked hidden" id="dashboard-locked">
                 <div class="locked-card">
-                    <p class="eyebrow">ACCESO PROTEGIDO</p>
+                    <p class="eyebrow">ACCESO REQUERIDO</p>
                     <h3>Inicia sesion con Discord</h3>
-                    <p>Solo el owner real o un owner secundario puede abrir el dashboard de un servidor.</p>
+                    <p>Solo el owner real o un owner secundario puede acceder al dashboard de configuracion.</p>
                     <a class="button" href="/auth/login">Entrar al panel</a>
                 </div>
             </section>
@@ -67,10 +67,10 @@
             <section class="server-hub hidden" id="server-hub">
                 <div class="section-heading">
                     <div>
-                        <p class="eyebrow">SERVER PICKER</p>
-                        <h2>Tus servidores</h2>
+                        <p class="eyebrow">TUS SERVIDORES</p>
+                        <h2>Selecciona un servidor</h2>
                     </div>
-                    <p class="section-copy">Solo aparece lo que realmente te pertenece o fue delegado para ti.</p>
+                    <p class="section-copy">Solo aparecen servidores donde tienes acceso como owner.</p>
                 </div>
                 <div class="dashboard-user" id="dashboard-user"></div>
                 <div class="server-grid" id="server-grid"></div>
@@ -79,11 +79,11 @@
             <section class="guild-view hidden" id="guild-view">
                 <div class="section-heading">
                     <div>
-                        <p class="eyebrow">GUILD DASHBOARD</p>
+                        <p class="eyebrow">CONFIGURACION</p>
                         <h2 id="guild-title">Panel del servidor</h2>
                     </div>
                     <div class="section-actions">
-                        <a class="button button-ghost" href="/dashboard">Volver a servidores</a>
+                        <a class="button button-ghost" href="/dashboard">Volver</a>
                         <button class="button" id="manual-backup-button" type="button">Crear backup</button>
                     </div>
                 </div>
@@ -93,17 +93,19 @@
                 <div class="panel-grid">
                     <article class="card card-wide">
                         <div class="card-header">
-                            <h3>Modulos y limites</h3>
+                            <h3>Modulos de proteccion</h3>
+                            <span>Configura las defensas del servidor</span>
                         </div>
                         <form class="settings-form" id="settings-form"></form>
                     </article>
 
                     <article class="card">
                         <div class="card-header">
-                            <h3>Owners del panel</h3>
+                            <h3>Owners secundarios</h3>
+                            <span>Acceso al panel</span>
                         </div>
                         <form id="owner-form" class="owner-form">
-                            <input id="owner-id-input" type="text" inputmode="numeric" placeholder="ID del owner secundario">
+                            <input id="owner-id-input" type="text" inputmode="numeric" placeholder="ID del usuario">
                             <button class="button" type="submit">Agregar</button>
                         </form>
                         <div id="owners-list" class="stack-list"></div>
@@ -112,9 +114,10 @@
                     <article class="card">
                         <div class="card-header">
                             <h3>Whitelist</h3>
+                            <span>Usuarios de confianza</span>
                         </div>
                         <form id="whitelist-form" class="owner-form">
-                            <input id="whitelist-id-input" type="text" inputmode="numeric" placeholder="ID para whitelist">
+                            <input id="whitelist-id-input" type="text" inputmode="numeric" placeholder="ID del usuario">
                             <button class="button" type="submit">Agregar</button>
                         </form>
                         <div id="whitelist-list" class="stack-list"></div>
@@ -123,9 +126,10 @@
                     <article class="card">
                         <div class="card-header">
                             <h3>Bots autorizados</h3>
+                            <span>Bots externos permitidos</span>
                         </div>
                         <form id="bot-form" class="owner-form">
-                            <input id="bot-id-input" type="text" inputmode="numeric" placeholder="ID del bot autorizado">
+                            <input id="bot-id-input" type="text" inputmode="numeric" placeholder="ID del bot">
                             <button class="button" type="submit">Agregar</button>
                         </form>
                         <div id="bots-list" class="stack-list"></div>
@@ -134,10 +138,11 @@
                     <article class="card">
                         <div class="card-header">
                             <h3>Bans permanentes</h3>
+                            <span>Bloqueo de reingreso</span>
                         </div>
                         <form id="ban-form" class="ban-form">
                             <input id="ban-id-input" type="text" inputmode="numeric" placeholder="ID a bloquear">
-                            <input id="ban-reason-input" type="text" placeholder="Motivo del ban permanente">
+                            <input id="ban-reason-input" type="text" placeholder="Motivo (opcional)">
                             <button class="button" type="submit">Agregar</button>
                         </form>
                         <div id="bans-list" class="stack-list"></div>
@@ -146,13 +151,15 @@
                     <article class="card">
                         <div class="card-header">
                             <h3>Backups</h3>
+                            <span>Copias de seguridad</span>
                         </div>
                         <div id="backup-list" class="stack-list"></div>
                     </article>
 
                     <article class="card">
                         <div class="card-header">
-                            <h3>Severidad</h3>
+                            <h3>Estadisticas</h3>
+                            <span>Incidentes por severidad</span>
                         </div>
                         <div id="severity-list" class="stack-list"></div>
                     </article>
@@ -160,6 +167,7 @@
                     <article class="card card-wide">
                         <div class="card-header">
                             <h3>Actividad reciente</h3>
+                            <span>Ultimos eventos de seguridad</span>
                         </div>
                         <div id="event-list" class="event-list"></div>
                     </article>
