@@ -1,8 +1,10 @@
 const { Client, GatewayIntentBits, Collection, Events, ActivityType } = require('discord.js');
 const fs = require('fs');
-const path = require('path');
 const http = require('node:http');
 require('dotenv').config();
+
+const { ensureWeeklyBackups } = require('./utils/security');
+const Database = require('./utils/database');
 
 const client = new Client({
     intents: [
@@ -29,18 +31,18 @@ client.cooldowns = new Collection();
 
 const commandFolders = fs.readdirSync('./src/commands');
 for (const folder of commandFolders) {
-    const commandFiles = fs.readdirSync(`./src/commands/${folder}`).filter(file => file.endsWith('.js'));
+    const commandFiles = fs.readdirSync(`./src/commands/${folder}`).filter((file) => file.endsWith('.js'));
     for (const file of commandFiles) {
         const command = require(`./commands/${folder}/${file}`);
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
         } else {
-            console.log(`[ADVERTENCIA] El comando en ./commands/${folder}/${file} carece de propiedad "data" o "execute".`);
+            console.log(`[WARN] El comando ./commands/${folder}/${file} no exporta data/execute.`);
         }
     }
 }
 
-const eventFiles = fs.readdirSync('./src/events').filter(file => file.endsWith('.js'));
+const eventFiles = fs.readdirSync('./src/events').filter((file) => file.endsWith('.js'));
 for (const file of eventFiles) {
     const event = require(`./events/${file}`);
     if (event.once) {
@@ -50,44 +52,52 @@ for (const file of eventFiles) {
     }
 }
 
-const Database = require('./utils/database');
-const db = new Database();
+client.db = new Database();
 
-client.db = db;
+client.once(Events.ClientReady, async (readyClient) => {
+    console.log(`Ghostly Guard en linea como ${readyClient.user.tag}`);
 
-client.once(Events.ClientReady, c => {
-    console.log(`✅ Ghostly Anti-Raid está en línea como ${c.user.tag}`);
-    
-    client.user.setActivity('🛡️ Protegiendo servidores', { type: ActivityType.Watching });
-    
+    client.user.setActivity('Protegiendo servidores', { type: ActivityType.Watching });
+
     setInterval(() => {
         const activities = [
-            '🛡️ Anti-Raid Activo',
-            '⚔️ Protegiendo servidores',
-            '🔍 Detectando amenazas',
-            '🚨 Seguridad 24/7'
+            'Anti-Raid activo',
+            'Protegiendo servidores',
+            'Detectando amenazas',
+            'Seguridad 24/7'
         ];
         const activity = activities[Math.floor(Math.random() * activities.length)];
         client.user.setActivity(activity, { type: ActivityType.Watching });
     }, 30000);
+
+    for (const [, guild] of client.guilds.cache) {
+        await client.db.ensureGuildSettings(guild.id);
+    }
+
+    await ensureWeeklyBackups(client);
+    setInterval(() => {
+        ensureWeeklyBackups(client).catch((error) => {
+            console.error('Error en el ciclo de backups:', error);
+        });
+    }, 6 * 60 * 60 * 1000);
 });
 
-process.on('unhandledRejection', error => {
+process.on('unhandledRejection', (error) => {
     console.error('Error no manejado:', error);
 });
 
-process.on('uncaughtException', error => {
-    console.error('Excepción no capturada:', error);
+process.on('uncaughtException', (error) => {
+    console.error('Excepcion no capturada:', error);
 });
 
 const port = Number(process.env.PORT) || 3000;
 http
     .createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Ghostly Anti-Raid Bot is running');
+        res.end('Ghostly Guard is running');
     })
     .listen(port, '0.0.0.0', () => {
-        console.log(`🌐 HTTP listo en el puerto ${port}`);
+        console.log(`HTTP listo en el puerto ${port}`);
     });
 
 client.login(process.env.DISCORD_TOKEN);

@@ -1,35 +1,33 @@
 const { Events, EmbedBuilder } = require('discord.js');
+const { createGuildBackup } = require('../utils/security');
 
 module.exports = {
     name: Events.GuildCreate,
     async execute(guild, client) {
-        console.log(`Bot añadido al servidor: ${guild.name} (ID: ${guild.id})`);
-        
+        console.log(`Bot anadido al servidor: ${guild.name} (${guild.id})`);
+
         try {
-            await client.db.createGuildSettings(guild.id);
-            console.log(`Configuración por defecto creada para ${guild.name}`);
+            await client.db.ensureGuildSettings(guild.id);
+            await createGuildBackup(client, guild, 'initial', client.user.id);
         } catch (error) {
-            console.error('Error al crear configuración del servidor:', error);
+            console.error('Error al preparar configuracion inicial:', error);
         }
 
         const owner = await guild.fetchOwner();
-        
         const welcomeEmbed = new EmbedBuilder()
-            .setTitle('¡Ghostly Anti-Raid está listo!')
-            .setColor('#00ff00')
-            .setDescription('Gracias por añadir Ghostly Anti-Raid a tu servidor. Estoy aquí para proteger tu comunidad.')
+            .setTitle('Ghostly Guard esta listo')
+            .setColor('#57f287')
+            .setDescription('Gracias por anadir Ghostly Guard. Ya puedes empezar a configurar la seguridad.')
             .addFields(
-                { name: 'Configuración Rápida', value: 'Usa `/setup` para configurar los canales de logs y verificación' },
-                { name: 'Comandos Principales', value: '```/settings - Ver configuración\n/antiraid - Activar/desactivar anti-raid\n/antinuke - Activar/desactivar anti-nuke```' },
-                { name: 'Soporte', value: '¿Necesitas ayuda? Únete a nuestro servidor de soporte' }
+                { name: 'Comandos base', value: '`/setup`, `/settings`, `/security`' },
+                { name: 'Recomendado', value: 'Configura un canal de logs y otro de alertas antes de ponerlo en produccion.' }
             )
-            .setTimestamp()
-            .setFooter({ text: 'Ghostly Anti-Raid - Protección 24/7' });
+            .setTimestamp();
 
         try {
             await owner.send({ embeds: [welcomeEmbed] });
         } catch (error) {
-            console.log('No se pudo enviar mensaje DM al owner del servidor');
+            console.log('No se pudo enviar DM al owner del servidor.');
         }
-    },
+    }
 };

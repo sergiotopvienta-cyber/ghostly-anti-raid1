@@ -37,9 +37,12 @@ class Database {
                 anti_alts INTEGER DEFAULT 1,
                 anti_links INTEGER DEFAULT 1,
                 anti_mentions INTEGER DEFAULT 1,
+                anti_bot_verified_only INTEGER DEFAULT 1,
+                lockdown_active INTEGER DEFAULT 0,
                 log_channel TEXT,
                 welcome_channel TEXT,
                 verification_role TEXT,
+                alert_channel TEXT,
                 max_joins_per_minute INTEGER DEFAULT 5,
                 max_messages_per_second INTEGER DEFAULT 3,
                 max_mentions_per_message INTEGER DEFAULT 5,
@@ -83,6 +86,47 @@ class Database {
                 user_id TEXT,
                 channel_id TEXT,
                 message_time DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS trusted_users (
+                guild_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                added_by TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (guild_id, user_id, type)
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS permanent_bans (
+                guild_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                reason TEXT,
+                added_by TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (guild_id, user_id)
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS security_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                severity TEXT DEFAULT 'info',
+                actor_id TEXT,
+                actor_tag TEXT,
+                target_id TEXT,
+                target_tag TEXT,
+                details TEXT,
+                metadata TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS backups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                type TEXT NOT NULL DEFAULT 'manual',
+                file_path TEXT NOT NULL,
+                created_by TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`
         ];
 
@@ -90,6 +134,24 @@ class Database {
             this.db.run(table, (err) => {
                 if (err) {
                     console.error('Error al crear tabla:', err.message);
+                }
+            });
+        });
+
+        this.runMigrations();
+    }
+
+    runMigrations() {
+        const migrations = [
+            'ALTER TABLE guild_settings ADD COLUMN anti_bot_verified_only INTEGER DEFAULT 1',
+            'ALTER TABLE guild_settings ADD COLUMN lockdown_active INTEGER DEFAULT 0',
+            'ALTER TABLE guild_settings ADD COLUMN alert_channel TEXT'
+        ];
+
+        migrations.forEach((migration) => {
+            this.db.run(migration, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Error en migracion SQLite:', err.message);
                 }
             });
         });
@@ -121,9 +183,12 @@ class Database {
             anti_alts: 1,
             anti_links: 1,
             anti_mentions: 1,
+            anti_bot_verified_only: 1,
+            lockdown_active: 0,
             log_channel: null,
             welcome_channel: null,
             verification_role: null,
+            alert_channel: null,
             max_joins_per_minute: 5,
             max_messages_per_second: 3,
             max_mentions_per_message: 5,
@@ -136,7 +201,14 @@ class Database {
         const values = keys.map(key => settings[key]);
         const setClause = keys.map(key => `${key} = ?`).join(', ');
 
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                await this.ensureGuildSettings(guildId);
+            } catch (error) {
+                reject(error);
+                return;
+            }
+
             this.db.run(
                 `UPDATE guild_settings SET ${setClause} WHERE guild_id = ?`,
                 [...values, guildId],
@@ -172,6 +244,27 @@ class Database {
         });
     }
 
+    ensureGuildSettings(guildId) {
+        return new Promise((resolve, reject) => {
+            const defaults = this.getDefaultSettings(guildId);
+            const keys = Object.keys(defaults);
+            const values = Object.values(defaults);
+            const placeholders = keys.map(() => '?').join(', ');
+
+            this.db.run(
+                `INSERT OR IGNORE INTO guild_settings (${keys.join(', ')}) VALUES (${placeholders})`,
+                values,
+                (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                }
+            );
+        });
+    }
+
     logRaid(guildId, userId, userTag, action, reason) {
         return new Promise((resolve, reject) => {
             this.db.run(
@@ -182,6 +275,244 @@ class Database {
                         reject(err);
                     } else {
                         resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    logSecurityEvent(event) {
+        const {
+            guildId,
+            type,
+            severity = 'info',
+            actorId = null,
+            actorTag = null,
+            targetId = null,
+            targetTag = null,
+            details = null,
+            metadata = null
+        } = event;
+
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                `INSERT INTO security_events (
+                    guild_id, type, severity, actor_id, actor_tag, target_id, target_tag, details, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    guildId,
+                    type,
+                    severity,
+                    actorId,
+                    actorTag,
+                    targetId,
+                    targetTag,
+                    details,
+                    metadata ? JSON.stringify(metadata) : null
+                ],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    getRecentSecurityEvents(guildId, limit = 10) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT * FROM security_events
+                 WHERE guild_id = ?
+                 ORDER BY created_at DESC
+                 LIMIT ?`,
+                [guildId, limit],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows);
+                    }
+                }
+            );
+        });
+    }
+
+    addTrustedUser(guildId, userId, type, addedBy = null) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR REPLACE INTO trusted_users (guild_id, user_id, type, added_by) VALUES (?, ?, ?, ?)',
+                [guildId, userId, type, addedBy],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
+                    }
+                }
+            );
+        });
+    }
+
+    removeTrustedUser(guildId, userId, type) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM trusted_users WHERE guild_id = ? AND user_id = ? AND type = ?',
+                [guildId, userId, type],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
+                    }
+                }
+            );
+        });
+    }
+
+    listTrustedUsers(guildId, type) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM trusted_users WHERE guild_id = ? AND type = ? ORDER BY created_at DESC',
+                [guildId, type],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows);
+                    }
+                }
+            );
+        });
+    }
+
+    async isTrustedUser(guildId, userId, type) {
+        const row = await new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT 1 FROM trusted_users WHERE guild_id = ? AND user_id = ? AND type = ?',
+                [guildId, userId, type],
+                (err, result) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(result);
+                    }
+                }
+            );
+        });
+
+        return Boolean(row);
+    }
+
+    addPermanentBan(guildId, userId, reason = null, addedBy = null) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR REPLACE INTO permanent_bans (guild_id, user_id, reason, added_by) VALUES (?, ?, ?, ?)',
+                [guildId, userId, reason, addedBy],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
+                    }
+                }
+            );
+        });
+    }
+
+    removePermanentBan(guildId, userId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM permanent_bans WHERE guild_id = ? AND user_id = ?',
+                [guildId, userId],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
+                    }
+                }
+            );
+        });
+    }
+
+    getPermanentBan(guildId, userId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM permanent_bans WHERE guild_id = ? AND user_id = ?',
+                [guildId, userId],
+                (err, row) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row || null);
+                    }
+                }
+            );
+        });
+    }
+
+    listPermanentBans(guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM permanent_bans WHERE guild_id = ? ORDER BY created_at DESC',
+                [guildId],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows);
+                    }
+                }
+            );
+        });
+    }
+
+    createBackupRecord(guildId, type, filePath, createdBy = null) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT INTO backups (guild_id, type, file_path, created_by) VALUES (?, ?, ?, ?)',
+                [guildId, type, filePath, createdBy],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    getLatestBackup(guildId, type = null) {
+        const query = type
+            ? 'SELECT * FROM backups WHERE guild_id = ? AND type = ? ORDER BY created_at DESC LIMIT 1'
+            : 'SELECT * FROM backups WHERE guild_id = ? ORDER BY created_at DESC LIMIT 1';
+        const params = type ? [guildId, type] : [guildId];
+
+        return new Promise((resolve, reject) => {
+            this.db.get(query, params, (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(row || null);
+                }
+            });
+        });
+    }
+
+    listBackups(guildId, limit = 5) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM backups WHERE guild_id = ? ORDER BY created_at DESC LIMIT ?',
+                [guildId, limit],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows);
                     }
                 }
             );

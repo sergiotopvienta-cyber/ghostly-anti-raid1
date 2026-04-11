@@ -1,167 +1,135 @@
-const { Events, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { Events } = require('discord.js');
+
+const {
+    AuditLogEvent,
+    createSecurityEvent,
+    fetchRecentAuditEntry,
+    isProtectedOwner,
+    isWhitelisted,
+    restoreDeletedChannel,
+    restoreDeletedRole
+} = require('../utils/security');
 
 module.exports = {
     name: Events.GuildMemberUpdate,
     async execute(oldMember, newMember, client) {
         const settings = await client.db.getGuildSettings(newMember.guild.id);
-        
         if (!settings.anti_nuke) return;
 
         if (oldMember.roles.cache.size !== newMember.roles.cache.size) {
             await handleRoleChanges(oldMember, newMember, client, settings);
         }
-    },
+    }
 };
 
 async function handleRoleChanges(oldMember, newMember, client, settings) {
-    const executor = await getAuditLogEntry(newMember.guild, 'MEMBER_ROLE_UPDATE', newMember.user.id);
-    
-    if (!executor) return;
-    
-    if (executor.executor.permissions.has(PermissionFlagsBits.Administrator)) return;
-    
-    const removedRoles = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
-    const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
+    const entry = await fetchRecentAuditEntry(newMember.guild, AuditLogEvent.MemberRoleUpdate, newMember.id);
+    if (!entry?.executor) return;
 
-    if (removedRoles.size > 5 || addedRoles.size > 5) {
-        await handleMassRoleChange(newMember.guild, executor, oldMember, newMember, client, settings, removedRoles, addedRoles);
-    }
-}
+    const executor = entry.executor;
+    if (await shouldIgnoreActor(client, newMember.guild, executor.id)) return;
 
-async function handleMassRoleChange(guild, executor, oldMember, newMember, client, settings, removedRoles, addedRoles) {
-    try {
-        await executor.executor.timeout(ms('1 hour'), 'Cambio masivo de roles detectado - Ghostly Anti-Raid');
-        
-        await client.db.logRaid(guild.id, executor.executor.id, executor.executor.user.tag, 'TIMEOUT_AUTO', 'Cambio masivo de roles');
+    const removedRoles = oldMember.roles.cache.filter((role) => !newMember.roles.cache.has(role.id));
+    const addedRoles = newMember.roles.cache.filter((role) => !oldMember.roles.cache.has(role.id));
 
-        for (const [_, role] of removedRoles) {
-            try {
-                await newMember.roles.add(role, 'Restauración automática - Ghostly Anti-Raid');
-            } catch (error) {
-                console.error('Error al restaurar rol:', error);
-            }
+    if (removedRoles.size > 3 || addedRoles.size > 3) {
+        const memberExecutor = await newMember.guild.members.fetch(executor.id).catch(() => null);
+        if (memberExecutor?.moderatable) {
+            await memberExecutor.timeout(60 * 60 * 1000, 'Cambio masivo de roles detectado');
         }
 
-        for (const [_, role] of addedRoles) {
-            try {
-                await newMember.roles.remove(role, 'Restauración automática - Ghostly Anti-Raid');
-            } catch (error) {
-                console.error('Error al remover rol añadido:', error);
-            }
+        for (const [, role] of removedRoles) {
+            await newMember.roles.add(role, 'Restauracion automatica Ghostly Guard').catch(() => null);
         }
 
-        if (settings.log_channel) {
-            const logChannel = guild.channels.cache.get(settings.log_channel);
-            if (logChannel) {
-                const embed = new EmbedBuilder()
-                    .setTitle('Cambio Masivo de Roles Detectado')
-                    .setColor('#ff0000')
-                    .setDescription('Se ha detectado un cambio masivo de roles y ha sido revertido')
-                    .addFields(
-                        { name: 'Ejecutor', value: `${executor.executor.user.tag} (${executor.executor.id})`, inline: true },
-                        { name: 'Víctima', value: `${newMember.user.tag} (${newMember.id})`, inline: true },
-                        { name: 'Roles removidos', value: removedRoles.size.toString(), inline: true },
-                        { name: 'Roles añadidos', value: addedRoles.size.toString(), inline: true },
-                        { name: 'Acción', value: 'Executor timeout 1 hora + Roles revertidos', inline: true }
-                    )
-                    .setTimestamp();
-
-                await logChannel.send({ embeds: [embed] });
-            }
+        for (const [, role] of addedRoles) {
+            await newMember.roles.remove(role, 'Restauracion automatica Ghostly Guard').catch(() => null);
         }
 
-    } catch (error) {
-        console.error('Error en manejo de cambio masivo de roles:', error);
-    }
-}
-
-async function getAuditLogEntry(guild, actionType, targetId) {
-    try {
-        const logs = await guild.fetchAuditLogs({
-            limit: 10,
-            type: actionType
+        await createSecurityEvent(client, newMember.guild, settings, {
+            type: 'MASS_ROLE_CHANGE_REVERTED',
+            severity: 'critical',
+            title: 'Cambio masivo de roles revertido',
+            color: '#ed4245',
+            description: `Se revirtieron cambios de roles hechos por ${executor.tag}.`,
+            actor: executor,
+            target: newMember.user,
+            metadata: {
+                removedRoles: removedRoles.map((role) => role.name),
+                addedRoles: addedRoles.map((role) => role.name)
+            },
+            alertOwners: true
         });
-
-        return logs.entries.find(entry => 
-            entry.target.id === targetId && 
-            (Date.now() - entry.createdTimestamp) < 5000
-        );
-    } catch (error) {
-        console.error('Error al obtener audit log:', error);
-        return null;
     }
 }
 
-async function handleChannelDeletion(channel, client, settings) {
-    const executor = await getAuditLogEntry(channel.guild, 'CHANNEL_DELETE', channel.id);
-    
-    if (!executor) return;
-    
-    if (executor.executor.permissions.has(PermissionFlagsBits.Administrator)) return;
+async function handleChannelDeletion(channel, client) {
+    const settings = await client.db.getGuildSettings(channel.guild.id);
+    if (!settings.anti_nuke) return;
 
-    try {
-        await executor.executor.timeout(ms('1 hour'), 'Eliminación masiva de canales detectada - Ghostly Anti-Raid');
-        
-        await client.db.logRaid(channel.guild.id, executor.executor.id, executor.executor.user.tag, 'TIMEOUT_AUTO', 'Eliminación de canal');
+    const entry = await fetchRecentAuditEntry(channel.guild, AuditLogEvent.ChannelDelete, channel.id);
+    if (!entry?.executor) return;
+    if (await shouldIgnoreActor(client, channel.guild, entry.executor.id)) return;
 
-        if (settings.log_channel) {
-            const logChannel = channel.guild.channels.cache.get(settings.log_channel);
-            if (logChannel) {
-                const embed = new EmbedBuilder()
-                    .title('Eliminación de Canal Detectada')
-                    .setColor('#ff0000')
-                    .setDescription('Se ha detectado la eliminación de un canal')
-                    .addFields(
-                        { name: 'Ejecutor', value: `${executor.executor.user.tag} (${executor.executor.id})`, inline: true },
-                        { name: 'Canal eliminado', value: `${channel.name} (${channel.id})`, inline: true },
-                        { name: 'Tipo', value: channel.type === 'GUILD_TEXT' ? 'Texto' : 'Voz', inline: true },
-                        { name: 'Acción', value: 'Executor timeout 1 hora', inline: true }
-                    )
-                    .setTimestamp();
+    await restoreDeletedChannel(channel).catch((error) => {
+        console.error('No se pudo restaurar el canal eliminado:', error.message);
+    });
 
-                await logChannel.send({ embeds: [embed] });
-            }
-        }
-
-    } catch (error) {
-        console.error('Error en manejo de eliminación de canal:', error);
+    const executorMember = await channel.guild.members.fetch(entry.executor.id).catch(() => null);
+    if (executorMember?.moderatable) {
+        await executorMember.timeout(60 * 60 * 1000, 'Eliminacion de canal detectada');
     }
+
+    await createSecurityEvent(client, channel.guild, settings, {
+        type: 'CHANNEL_RESTORED',
+        severity: 'critical',
+        title: 'Canal restaurado automaticamente',
+        color: '#ed4245',
+        description: `Se detecto la eliminacion del canal ${channel.name} y se intento restaurar.`,
+        actor: entry.executor,
+        metadata: { channelId: channel.id, channelName: channel.name },
+        alertOwners: true
+    });
 }
 
-async function handleRoleDeletion(role, client, settings) {
-    const executor = await getAuditLogEntry(role.guild, 'ROLE_DELETE', role.id);
-    
-    if (!executor) return;
-    
-    if (executor.executor.permissions.has(PermissionFlagsBits.Administrator)) return;
+async function handleRoleDeletion(role, client) {
+    const settings = await client.db.getGuildSettings(role.guild.id);
+    if (!settings.anti_nuke) return;
 
-    try {
-        await executor.executor.timeout(ms('1 hour'), 'Eliminación masiva de roles detectada - Ghostly Anti-Raid');
-        
-        await client.db.logRaid(role.guild.id, executor.executor.id, executor.executor.user.tag, 'TIMEOUT_AUTO', 'Eliminación de rol');
+    const entry = await fetchRecentAuditEntry(role.guild, AuditLogEvent.RoleDelete, role.id);
+    if (!entry?.executor) return;
+    if (await shouldIgnoreActor(client, role.guild, entry.executor.id)) return;
 
-        if (settings.log_channel) {
-            const logChannel = role.guild.channels.cache.get(settings.log_channel);
-            if (logChannel) {
-                const embed = new EmbedBuilder()
-                    .setTitle('Eliminación de Rol Detectada')
-                    .setColor('#ff0000')
-                    .setDescription('Se ha detectado la eliminación de un rol')
-                    .addFields(
-                        { name: 'Ejecutor', value: `${executor.executor.user.tag} (${executor.executor.id})`, inline: true },
-                        { name: 'Rol eliminado', value: `${role.name} (${role.id})`, inline: true },
-                        { name: 'Color', value: role.hexColor || 'N/A', inline: true },
-                        { name: 'Acción', value: 'Executor timeout 1 hora', inline: true }
-                    )
-                    .setTimestamp();
+    await restoreDeletedRole(role).catch((error) => {
+        console.error('No se pudo restaurar el rol eliminado:', error.message);
+    });
 
-                await logChannel.send({ embeds: [embed] });
-            }
-        }
-
-    } catch (error) {
-        console.error('Error en manejo de eliminación de rol:', error);
+    const executorMember = await role.guild.members.fetch(entry.executor.id).catch(() => null);
+    if (executorMember?.moderatable) {
+        await executorMember.timeout(60 * 60 * 1000, 'Eliminacion de rol detectada');
     }
+
+    await createSecurityEvent(client, role.guild, settings, {
+        type: 'ROLE_RESTORED',
+        severity: 'critical',
+        title: 'Rol restaurado automaticamente',
+        color: '#ed4245',
+        description: `Se detecto la eliminacion del rol ${role.name} y se intento restaurar.`,
+        actor: entry.executor,
+        metadata: { roleId: role.id, roleName: role.name },
+        alertOwners: true
+    });
+}
+
+async function shouldIgnoreActor(client, guild, userId) {
+    if (!userId) return true;
+    if (await isProtectedOwner(client, guild, userId)) return true;
+    if (await isWhitelisted(client, guild.id, userId)) return true;
+
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member) return false;
+
+    return member.id === guild.members.me?.id;
 }
 
 module.exports.handleChannelDeletion = handleChannelDeletion;
