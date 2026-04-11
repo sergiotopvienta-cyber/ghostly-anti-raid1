@@ -21,7 +21,10 @@
                 <a href="#dashboard">Dashboard</a>
                 <a href="#servers">Servidores</a>
             </nav>
-            <a class="button button-ghost" href="#dashboard">Abrir panel</a>
+            <div class="topbar-actions">
+                <button class="button button-ghost hidden" id="logout-button" type="button">Cerrar sesion</button>
+                <a class="button button-ghost" id="login-button" href="/auth/login">Entrar con Discord</a>
+            </div>
         </header>
 
         <main>
@@ -62,8 +65,8 @@
                     <p>Restaura canales y roles borrados mientras registra auditoria y acciones.</p>
                 </article>
                 <article>
-                    <h3>Weekly Backups</h3>
-                    <p>Snapshots automaticos del servidor para no depender de la memoria del staff.</p>
+                    <h3>Owner Access</h3>
+                    <p>Solo owner real, owner secundario o super admin pueden abrir y usar el panel.</p>
                 </article>
             </section>
 
@@ -78,16 +81,28 @@
                     </p>
                 </div>
 
-                <div class="dashboard-layout">
-                    <aside class="server-list-card">
+                <div class="auth-banner hidden" id="auth-banner"></div>
+
+                <div class="dashboard-locked" id="dashboard-locked">
+                    <div class="locked-card">
+                        <p class="eyebrow">ACCESO PROTEGIDO</p>
+                        <h3>Inicia sesion con Discord</h3>
+                        <p>El dashboard solo se desbloquea para owners reales, owners secundarios y tu cuenta super admin.</p>
+                        <a class="button" href="/auth/login">Entrar al panel</a>
+                    </div>
+                </div>
+
+                <div class="dashboard-layout hidden" id="dashboard-app">
+                    <aside class="server-list-card" id="servers">
                         <div class="card-header">
-                            <h3>Servidores conectados</h3>
+                            <h3>Servidores permitidos</h3>
                             <span id="server-count">0</span>
                         </div>
                         <div id="server-list" class="server-list"></div>
                     </aside>
 
                     <section class="dashboard-main">
+                        <div class="dashboard-user" id="dashboard-user"></div>
                         <div class="summary-grid" id="guild-summary"></div>
 
                         <div class="panel-grid">
@@ -110,6 +125,17 @@
                                     <h3>Actividad reciente</h3>
                                 </div>
                                 <div id="event-list" class="event-list"></div>
+                            </article>
+
+                            <article class="card">
+                                <div class="card-header">
+                                    <h3>Owners del panel</h3>
+                                </div>
+                                <form id="owner-form" class="owner-form">
+                                    <input id="owner-id-input" type="text" inputmode="numeric" placeholder="ID del nuevo owner secundario">
+                                    <button class="button" type="submit">Agregar</button>
+                                </form>
+                                <div id="owners-list" class="stack-list"></div>
                             </article>
 
                             <article class="card">
