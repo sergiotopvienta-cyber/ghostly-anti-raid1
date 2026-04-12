@@ -8,20 +8,11 @@
 </head>
 <body>
     <div id="app">
-        <div class="ambient ambient-left"></div>
-        <div class="ambient ambient-right"></div>
-
         <nav class="navbar">
-            <div class="nav-brand">
-                <span class="brand-mark">G</span>
-                <div>
-                    <span class="brand-name">Ghostly Guard</span>
-                    <span class="brand-subtitle">Anti-raid dashboard</span>
-                </div>
-            </div>
+            <div class="nav-brand">Ghostly Guard</div>
             <div class="nav-links">
                 <a href="/" class="nav-link">Inicio</a>
-                <a href="/dashboard" class="nav-link">Panel</a>
+                <a href="/dashboard" class="nav-link">Dashboard</a>
             </div>
             <div class="nav-auth">
                 <button id="login-btn" class="btn btn-primary">Entrar con Discord</button>
@@ -31,197 +22,62 @@
 
         <main class="main-content">
             <div id="landing" class="page">
-                <section class="hero-shell">
-                    <div class="hero-copy">
-                        <div class="eyebrow">Protección rápida para Discord</div>
-                        <h1>Un dashboard limpio, veloz y pensado para controlar el caos.</h1>
-                        <p class="hero-text">
-                            Entra con Discord, elige tu servidor y administra anti-raid, whitelist, bots y bans
-                            permanentes desde una interfaz más ligera y mucho más clara.
-                        </p>
-
-                        <div class="hero-actions">
-                            <button id="hero-primary" class="btn btn-primary">Entrar con Discord</button>
-                            <a id="hero-secondary" href="/dashboard" class="btn btn-secondary">Abrir dashboard</a>
-                        </div>
-
-                        <div class="hero-chips" aria-label="Características principales">
-                            <span>Login primero</span>
-                            <span>Servidor por servidor</span>
-                            <span>Sin panel pesado</span>
-                        </div>
-                    </div>
-
-                    <aside class="hero-preview" aria-label="Vista previa del panel">
-                        <div class="preview-card preview-card-main">
-                            <div class="preview-label">Panel de control</div>
-                            <div class="preview-title">Estado listo para administrar</div>
-                            <div class="preview-list">
-                                <div><span class="dot dot-raid"></span> Anti-raid activo</div>
-                                <div><span class="dot dot-lock"></span> Gestión de servidores protegidos</div>
-                                <div><span class="dot dot-log"></span> Eventos recientes visibles</div>
-                            </div>
-                        </div>
-                        <div class="preview-card preview-card-side">
-                            <div class="preview-stat">
-                                <span>Acceso</span>
-                                <strong>Discord OAuth</strong>
-                            </div>
-                            <div class="preview-stat">
-                                <span>Diseño</span>
-                                <strong>Ligero y fluido</strong>
-                            </div>
-                        </div>
-                    </aside>
-                </section>
-
-                <section class="feature-band">
-                    <article class="feature-card">
-                        <span class="feature-kicker">Inicio</span>
-                        <h2>Una primera impresión más fuerte.</h2>
-                        <p>La portada deja de parecer una lista técnica y pasa a sentirse como un producto terminado.</p>
-                    </article>
-                    <article class="feature-card">
-                        <span class="feature-kicker">Servidores</span>
-                        <h2>Tarjetas simples y directas.</h2>
-                        <p>Selecciona el servidor y entra sin distracciones, con solo la información útil en pantalla.</p>
-                    </article>
-                    <article class="feature-card">
-                        <span class="feature-kicker">Parte baja</span>
-                        <h2>Un cierre con contexto.</h2>
-                        <p>La zona inferior concentra actividad y estado del bot para que el panel no se sienta vacío.</p>
-                    </article>
-                </section>
+                <div class="hero">
+                    <h1>Ghostly Guard</h1>
+                    <p>Protección avanzada contra raids, nukes y spam para tu servidor de Discord</p>
+                    <a href="/dashboard" class="btn btn-primary">Ir al Dashboard</a>
+                </div>
             </div>
 
             <div id="dashboard" class="page hidden">
-                <section class="dashboard-shell">
-                    <div class="panel panel-soft">
-                        <div class="section-heading">
-                            <div>
-                                <span class="eyebrow">Resumen</span>
-                                <h2>Tu centro de control</h2>
-                            </div>
-                            <p>Una vista rápida de la salud de tu red de servidores protegidos.</p>
-                        </div>
-                        <div id="overview-cards" class="overview-grid"></div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="section-heading">
-                            <div>
-                                <span class="eyebrow">Servidores</span>
-                                <h2>Tus servidores</h2>
-                            </div>
-                            <p>Elige uno para ajustar sus reglas y listas de confianza.</p>
-                        </div>
-                        <div id="servers-grid" class="servers-grid"></div>
-                    </div>
-
-                    <div class="bottom-grid">
-                        <section class="panel">
-                            <div class="section-heading">
-                                <div>
-                                    <span class="eyebrow">Actividad</span>
-                                    <h3>Eventos recientes</h3>
-                                </div>
-                                <p>Lo último que bloqueó o detectó el bot.</p>
-                            </div>
-                            <div id="recent-events" class="event-list"></div>
-                        </section>
-
-                        <section class="panel panel-compact">
-                            <div class="section-heading">
-                                <div>
-                                    <span class="eyebrow">Estado</span>
-                                    <h3>Protección activa</h3>
-                                </div>
-                                <p>Información general del bot y la cobertura actual.</p>
-                            </div>
-                            <div id="status-list" class="status-list"></div>
-                        </section>
-                    </div>
-                </section>
+                <div class="server-list" id="server-list">
+                    <h2>Tus Servidores</h2>
+                    <div id="servers-grid" class="servers-grid"></div>
+                </div>
             </div>
 
             <div id="guild" class="page hidden">
                 <div class="guild-header">
                     <button id="back-btn" class="btn btn-secondary">← Volver</button>
-                    <div>
-                        <span class="eyebrow">Servidor</span>
-                        <h2 id="guild-name">Servidor</h2>
-                    </div>
+                    <h2 id="guild-name">Servidor</h2>
                 </div>
-
                 <div class="guild-content">
-                    <div class="section panel">
-                        <div class="section-heading">
-                            <div>
-                                <span class="eyebrow">Configuración</span>
-                                <h3>Protección y canales</h3>
-                            </div>
-                            <p>Ajusta reglas, límites y canales de aviso.</p>
-                        </div>
+                    <div class="section">
+                        <h3>Configuración</h3>
                         <form id="settings-form" class="settings-form"></form>
                     </div>
-
-                    <div class="guild-grid">
-                        <div class="section panel">
-                            <div class="section-heading">
-                                <div>
-                                    <span class="eyebrow">Owners</span>
-                                    <h3>Owners secundarios</h3>
-                                </div>
-                            </div>
-                            <form id="owner-form" class="add-form">
-                                <input type="text" id="owner-input" placeholder="ID del usuario">
-                                <button type="submit" class="btn btn-primary">Agregar</button>
-                            </form>
-                            <div id="owners-list" class="list"></div>
-                        </div>
-
-                        <div class="section panel">
-                            <div class="section-heading">
-                                <div>
-                                    <span class="eyebrow">Whitelist</span>
-                                    <h3>Usuarios permitidos</h3>
-                                </div>
-                            </div>
-                            <form id="whitelist-form" class="add-form">
-                                <input type="text" id="whitelist-input" placeholder="ID del usuario">
-                                <button type="submit" class="btn btn-primary">Agregar</button>
-                            </form>
-                            <div id="whitelist-list" class="list"></div>
-                        </div>
-
-                        <div class="section panel">
-                            <div class="section-heading">
-                                <div>
-                                    <span class="eyebrow">Bots</span>
-                                    <h3>Bots autorizados</h3>
-                                </div>
-                            </div>
-                            <form id="bot-form" class="add-form">
-                                <input type="text" id="bot-input" placeholder="ID del bot">
-                                <button type="submit" class="btn btn-primary">Agregar</button>
-                            </form>
-                            <div id="bots-list" class="list"></div>
-                        </div>
-
-                        <div class="section panel">
-                            <div class="section-heading">
-                                <div>
-                                    <span class="eyebrow">Bans</span>
-                                    <h3>Bans permanentes</h3>
-                                </div>
-                            </div>
-                            <form id="ban-form" class="add-form">
-                                <input type="text" id="ban-input" placeholder="ID a bloquear">
-                                <input type="text" id="ban-reason" placeholder="Motivo (opcional)">
-                                <button type="submit" class="btn btn-primary">Agregar</button>
-                            </form>
-                            <div id="bans-list" class="list"></div>
-                        </div>
+                    <div class="section">
+                        <h3>Owners Secundarios</h3>
+                        <form id="owner-form" class="add-form">
+                            <input type="text" id="owner-input" placeholder="ID del usuario">
+                            <button type="submit" class="btn btn-primary">Agregar</button>
+                        </form>
+                        <div id="owners-list" class="list"></div>
+                    </div>
+                    <div class="section">
+                        <h3>Whitelist</h3>
+                        <form id="whitelist-form" class="add-form">
+                            <input type="text" id="whitelist-input" placeholder="ID del usuario">
+                            <button type="submit" class="btn btn-primary">Agregar</button>
+                        </form>
+                        <div id="whitelist-list" class="list"></div>
+                    </div>
+                    <div class="section">
+                        <h3>Bots Autorizados</h3>
+                        <form id="bot-form" class="add-form">
+                            <input type="text" id="bot-input" placeholder="ID del bot">
+                            <button type="submit" class="btn btn-primary">Agregar</button>
+                        </form>
+                        <div id="bots-list" class="list"></div>
+                    </div>
+                    <div class="section">
+                        <h3>Bans Permanentes</h3>
+                        <form id="ban-form" class="add-form">
+                            <input type="text" id="ban-input" placeholder="ID a bloquear">
+                            <input type="text" id="ban-reason" placeholder="Motivo (opcional)">
+                            <button type="submit" class="btn btn-primary">Agregar</button>
+                        </form>
+                        <div id="bans-list" class="list"></div>
                     </div>
                 </div>
             </div>

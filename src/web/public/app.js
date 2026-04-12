@@ -1,17 +1,13 @@
 const state = {
     session: null,
     guilds: [],
-    guildDetail: null,
-    overview: null
+    guildDetail: null
 };
 
 async function init() {
     const loginBtn = document.getElementById('login-btn');
     const logoutBtn = document.getElementById('logout-btn');
-    const heroPrimary = document.getElementById('hero-primary');
-    const heroSecondary = document.getElementById('hero-secondary');
     const backBtn = document.getElementById('back-btn');
-    const path = window.location.pathname;
 
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
@@ -25,192 +21,46 @@ async function init() {
         });
     }
 
-    if (heroPrimary) {
-        heroPrimary.addEventListener('click', () => {
-            window.location.href = state.session?.authenticated ? '/dashboard' : '/auth/login';
-        });
-    }
-
-    if (heroSecondary) {
-        heroSecondary.addEventListener('click', (event) => {
-            if (state.session?.authenticated) {
-                event.preventDefault();
-                window.location.href = '/auth/logout';
-            }
-        });
-    }
-
     if (backBtn) {
         backBtn.addEventListener('click', () => {
             window.location.href = '/dashboard';
         });
     }
 
-    if (path === '/') {
-        showPage('landing');
-    } else if (path === '/dashboard' || path.startsWith('/dashboard/')) {
-        showPage(path.startsWith('/dashboard/') ? 'guild' : 'dashboard');
-        setLoadingState(path.startsWith('/dashboard/') ? 'guild' : 'dashboard');
-    } else {
-        showPage('landing');
-    }
+    try {
+        const session = await fetch('/api/session').then(r => r.json());
+        state.session = session;
 
-    fetch('/api/session')
-        .then((r) => r.json())
-        .then(async (session) => {
-            state.session = session;
-            syncAuthButtons(session);
-            syncHeroActions(session);
+        if (session.authenticated && loginBtn && logoutBtn) {
+            loginBtn.classList.add('hidden');
+            logoutBtn.classList.remove('hidden');
+        }
 
-            if (path.startsWith('/dashboard/')) {
-                if (!session.authenticated) {
-                    window.location.href = '/auth/login';
-                    return;
-                }
+        const path = window.location.pathname;
 
-                const guildId = path.split('/')[2];
-                await loadGuild(guildId);
+        if (path === '/') {
+            showPage('landing');
+        } else if (path.startsWith('/dashboard/')) {
+            if (!session.authenticated) {
+                window.location.href = '/auth/login';
                 return;
             }
-
-            if (path === '/dashboard') {
-                if (!session.authenticated) {
-                    window.location.href = '/auth/login';
-                    return;
-                }
-
-                await loadDashboard();
+            const guildId = path.split('/')[2];
+            await loadGuild(guildId);
+        } else if (path === '/dashboard') {
+            if (!session.authenticated) {
+                window.location.href = '/auth/login';
+                return;
             }
-        })
-        .catch((error) => {
-            console.error('Init error:', error);
-            showMessage('Error al cargar el dashboard', 'error');
-        });
-}
-
-function syncAuthButtons(session) {
-    const loginBtn = document.getElementById('login-btn');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    if (!loginBtn || !logoutBtn) {
-        return;
-    }
-
-    if (session?.authenticated) {
-        loginBtn.classList.add('hidden');
-        logoutBtn.classList.remove('hidden');
-    } else {
-        loginBtn.classList.remove('hidden');
-        logoutBtn.classList.add('hidden');
-    }
-}
-
-function syncHeroActions(session) {
-    const heroPrimary = document.getElementById('hero-primary');
-    const heroSecondary = document.getElementById('hero-secondary');
-
-    if (heroPrimary) {
-        heroPrimary.textContent = session?.authenticated ? 'Abrir dashboard' : 'Entrar con Discord';
-    }
-
-    if (heroSecondary) {
-        heroSecondary.textContent = session?.authenticated ? 'Cerrar sesión' : 'Abrir dashboard';
-        heroSecondary.href = session?.authenticated ? '/auth/logout' : '/dashboard';
-    }
-}
-
-async function loadDashboard() {
-    try {
-        setLoadingState('dashboard');
-
-        const guildsResponse = await fetch('/api/guilds');
-        const guildData = guildsResponse.ok ? await guildsResponse.json() : { guilds: [] };
-        state.guilds = guildData.guilds || [];
-        renderServers(state.guilds);
-
-        const overviewResponse = await fetch('/api/overview');
-        const overview = overviewResponse.ok ? await overviewResponse.json() : {};
-        state.overview = overview || {};
-
-        renderOverview(state.overview);
-        renderRecentEvents(state.overview.recentEvents || []);
-        renderStatus(state.overview);
+            await loadServers();
+            showPage('dashboard');
+        } else {
+            showPage('landing');
+        }
     } catch (error) {
-        console.error('Error loading dashboard:', error);
-        showMessage('No se pudo cargar el resumen', 'error');
-        await loadServers();
+        console.error('Init error:', error);
+        showMessage('Error al cargar el dashboard', 'error');
     }
-}
-
-function setLoadingState(page) {
-    const overviewCards = document.getElementById('overview-cards');
-    const serversGrid = document.getElementById('servers-grid');
-    const recentEvents = document.getElementById('recent-events');
-    const statusList = document.getElementById('status-list');
-    const guildName = document.getElementById('guild-name');
-    const settingsForm = document.getElementById('settings-form');
-
-    if (page === 'dashboard') {
-        if (overviewCards) {
-            overviewCards.innerHTML = `
-                <div class="loading-card"></div>
-                <div class="loading-card"></div>
-                <div class="loading-card"></div>
-                <div class="loading-card"></div>
-            `;
-        }
-        if (serversGrid) {
-            serversGrid.innerHTML = `
-                <div class="loading-card loading-server"></div>
-                <div class="loading-card loading-server"></div>
-                <div class="loading-card loading-server"></div>
-                <div class="loading-card loading-server"></div>
-            `;
-        }
-        if (recentEvents) {
-            recentEvents.innerHTML = '<div class="loading-card loading-line"></div><div class="loading-card loading-line"></div>';
-        }
-        if (statusList) {
-            statusList.innerHTML = '<div class="loading-card loading-line"></div><div class="loading-card loading-line"></div>';
-        }
-    }
-
-    if (page === 'guild') {
-        if (guildName) guildName.textContent = 'Cargando...';
-        if (settingsForm) {
-            settingsForm.innerHTML = `
-                <div class="loading-card loading-form"></div>
-                <div class="loading-card loading-form"></div>
-                <div class="loading-card loading-form"></div>
-                <div class="loading-card loading-form"></div>
-            `;
-        }
-    }
-}
-
-function renderOverview(overview = {}) {
-    const container = document.getElementById('overview-cards');
-    if (!container) return;
-
-    const eventTotal = Array.isArray(overview.eventCounts)
-        ? overview.eventCounts.reduce((sum, item) => sum + Number(item.total || 0), 0)
-        : 0;
-
-    const stats = overview.stats || {};
-    const cards = [
-        { label: 'Servidores', value: stats.totalGuilds ?? 0, meta: 'Con acceso' },
-        { label: 'Eventos bloqueados', value: eventTotal, meta: 'Severidades combinadas' },
-        { label: 'Whitelist', value: stats.whitelistEntries ?? 0, meta: 'Entradas protegidas' },
-        { label: 'Uptime', value: `${stats.uptimeHours ?? 0}h`, meta: 'Tiempo en línea' }
-    ];
-
-    container.innerHTML = cards.map((card, index) => `
-        <article class="overview-card" style="--card-delay:${index * 0.06}s">
-            <span>${card.label}</span>
-            <strong>${formatCardValue(card.value)}</strong>
-            <small>${card.meta}</small>
-        </article>
-    `).join('');
 }
 
 async function loadServers() {
@@ -221,92 +71,19 @@ async function loadServers() {
         const response = await fetch('/api/guilds');
         const data = await response.json();
         state.guilds = data.guilds || [];
-        renderServers(state.guilds);
+
+        serversGrid.innerHTML = state.guilds.length
+            ? state.guilds.map(guild => `
+                <div class="server-card" onclick="window.location.href='/dashboard/${guild.id}'">
+                    <h3>${escapeHtml(guild.name)}</h3>
+                    <small>${escapeHtml(guild.accessLevel)}</small>
+                </div>
+            `).join('')
+            : '<p class="empty">No tienes servidores disponibles</p>';
     } catch (error) {
         console.error('Error loading servers:', error);
         showMessage('Error al cargar servidores', 'error');
     }
-}
-
-function renderServers(guilds) {
-    const serversGrid = document.getElementById('servers-grid');
-    if (!serversGrid) return;
-
-    serversGrid.innerHTML = guilds.length
-        ? guilds.map((guild, index) => `
-            <button class="server-card" style="--card-delay:${index * 0.05}s" onclick="window.location.href='/dashboard/${guild.id}'">
-                <div class="server-card-head">
-                    <div class="server-avatar">
-                        ${guild.icon ? `<img src="${escapeHtml(guild.icon)}" alt="${escapeHtml(guild.name)}">` : `<span>${getInitials(guild.name)}</span>`}
-                    </div>
-                    <div class="server-card-title">
-                        <h3>${escapeHtml(guild.name)}</h3>
-                        <small>${escapeHtml(guild.accessLevel || 'Acceso')}</small>
-                    </div>
-                </div>
-
-                <div class="server-card-meta">
-                    <span class="tag ${guild.features?.antiRaid ? 'tag-on' : 'tag-off'}">Anti-raid</span>
-                    <span class="tag ${guild.features?.antiNuke ? 'tag-on' : 'tag-off'}">Anti-nuke</span>
-                    <span class="tag ${guild.features?.lockdown ? 'tag-on' : 'tag-off'}">Lockdown</span>
-                </div>
-
-                <div class="server-card-footer">
-                    <span>${guild.incidents || 0} eventos recientes</span>
-                    <span class="server-card-arrow">Ver</span>
-                </div>
-            </button>
-        `).join('')
-        : '<p class="empty">No tienes servidores disponibles</p>';
-}
-
-function renderRecentEvents(events = []) {
-    const container = document.getElementById('recent-events');
-    if (!container) return;
-
-    if (!events.length) {
-        container.innerHTML = '<p class="empty">Sin eventos recientes.</p>';
-        return;
-    }
-
-    container.innerHTML = events.map((event) => `
-        <article class="event-item">
-            <div class="event-main">
-                <strong>${escapeHtml(event.guild_name || 'Servidor')}</strong>
-                <p>${escapeHtml(event.description || event.event_type || 'Actividad detectada')}</p>
-            </div>
-            <div class="event-side">
-                <span class="event-severity severity-${formatSeverity(event.severity)}">${escapeHtml(event.severity || 'info')}</span>
-                <small>${formatRelativeTime(event.created_at)}</small>
-            </div>
-        </article>
-    `).join('');
-}
-
-function renderStatus(overview = {}) {
-    const container = document.getElementById('status-list');
-    if (!container) return;
-
-    const stats = overview.stats || {};
-    const bot = overview.bot || {};
-    const eventTotal = Array.isArray(overview.eventCounts)
-        ? overview.eventCounts.reduce((sum, item) => sum + Number(item.total || 0), 0)
-        : 0;
-
-    const rows = [
-        { label: 'Bot', value: bot.name || 'Ghostly Guard' },
-        { label: 'Servidores protegidos', value: stats.totalGuilds ?? 0 },
-        { label: 'Eventos bloqueados', value: eventTotal },
-        { label: 'Lockdowns activos', value: stats.lockdownGuilds ?? 0 },
-        { label: 'Bans permanentes', value: stats.permanentBans ?? 0 }
-    ];
-
-    container.innerHTML = rows.map((row) => `
-        <div class="status-row">
-            <span>${row.label}</span>
-            <strong>${formatCardValue(row.value)}</strong>
-        </div>
-    `).join('');
 }
 
 async function loadGuild(guildId) {
@@ -321,10 +98,10 @@ async function loadGuild(guildId) {
         guildName.textContent = data.guild.name;
 
         renderSettingsForm(data.settings);
-        renderList('owners-list', data.owners, 'owners');
+        renderList('owners-list', data.owners, 'owner');
         renderList('whitelist-list', data.whitelist, 'whitelist');
-        renderList('bots-list', data.bots, 'bots');
-        renderList('bans-list', data.bans, 'bans');
+        renderList('bots-list', data.bots, 'bot');
+        renderList('bans-list', data.bans, 'ban');
 
         setupForms(guildId);
         showPage('guild');
@@ -350,19 +127,19 @@ function renderSettingsForm(settings) {
     ];
 
     form.innerHTML = `
-        ${toggles.map((key) => `
+        ${toggles.map(key => `
             <label>
                 <span>${formatKey(key)}</span>
                 <input type="checkbox" name="${key}" ${settings[key] ? 'checked' : ''}>
             </label>
         `).join('')}
-        ${numbers.map((key) => `
+        ${numbers.map(key => `
             <label>
                 <span>${formatKey(key)}</span>
-                <input type="number" name="${key}" value="${settings[key] ?? 0}">
+                <input type="number" name="${key}" value="${settings[key]}">
             </label>
         `).join('')}
-        ${texts.map((key) => `
+        ${texts.map(key => `
             <label>
                 <span>${formatKey(key)}</span>
                 <input type="text" name="${key}" value="${settings[key] || ''}">
@@ -381,7 +158,7 @@ function renderList(containerId, items, type) {
         return;
     }
 
-    container.innerHTML = items.map((item) => `
+    container.innerHTML = items.map(item => `
         <div class="list-item">
             <span>${item.user_id || item.id}</span>
             <button onclick="removeItem('${type}', '${item.user_id || item.id}')">Eliminar</button>
@@ -457,7 +234,7 @@ async function saveSettings() {
         'anti_alts', 'anti_links', 'anti_mentions', 'anti_bot_verified_only', 'lockdown_active'
     ];
 
-    toggles.forEach((key) => {
+    toggles.forEach(key => {
         const checkbox = form.querySelector(`input[name="${key}"]`);
         if (checkbox) {
             payload[key] = checkbox.checked ? 1 : 0;
@@ -469,7 +246,7 @@ async function saveSettings() {
         'max_mentions_per_message', 'min_account_age_days'
     ];
 
-    numbers.forEach((key) => {
+    numbers.forEach(key => {
         const input = form.querySelector(`input[name="${key}"]`);
         if (input) {
             payload[key] = Number(input.value);
@@ -480,7 +257,7 @@ async function saveSettings() {
         'log_channel', 'alert_channel', 'welcome_channel', 'verification_role'
     ];
 
-    texts.forEach((key) => {
+    texts.forEach(key => {
         const input = form.querySelector(`input[name="${key}"]`);
         if (input) {
             payload[key] = input.value.trim() || null;
@@ -549,56 +326,7 @@ function escapeHtml(text) {
 }
 
 function formatKey(key) {
-    return key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-}
-
-function formatNumber(num) {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toString();
-}
-
-function formatCardValue(value) {
-    if (typeof value === 'number') {
-        return formatNumber(value);
-    }
-
-    return String(value);
-}
-
-function getInitials(name = '') {
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0].toUpperCase())
-        .join('');
-}
-
-function formatSeverity(severity = '') {
-    return severity.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-}
-
-function formatRelativeTime(value) {
-    if (!value) return '';
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-
-    const diffMs = Date.now() - date.getTime();
-    const diffMinutes = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMinutes < 1) return 'Ahora mismo';
-    if (diffMinutes < 60) return `Hace ${diffMinutes}m`;
-    if (diffHours < 24) return `Hace ${diffHours}h`;
-    if (diffDays < 7) return `Hace ${diffDays}d`;
-
-    return date.toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: 'short'
-    });
+    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 document.addEventListener('DOMContentLoaded', init);
