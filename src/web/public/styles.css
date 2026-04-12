@@ -36,12 +36,21 @@ body {
     color: #f1c40f;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
-.nav-brand::before {
-    content: '🛡️';
-    font-size: 1.2rem;
+.nav-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid #f1c40f;
+    box-shadow: 0 0 12px rgba(241, 196, 15, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-logo:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 0 20px rgba(241, 196, 15, 0.6);
 }
 
 .nav-links {
