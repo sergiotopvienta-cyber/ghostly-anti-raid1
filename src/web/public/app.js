@@ -9,6 +9,7 @@ async function init() {
     const logoutBtn = document.getElementById('logout-btn');
     const backBtn = document.getElementById('back-btn');
     const dashboardBtn = document.querySelector('.hero .btn-primary');
+    const themeToggle = document.getElementById('theme-toggle');
 
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
@@ -26,6 +27,11 @@ async function init() {
         backBtn.addEventListener('click', () => {
             window.location.href = '/dashboard';
         });
+    }
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+        loadTheme();
     }
 
     const path = window.location.pathname;
@@ -52,6 +58,8 @@ async function init() {
             }
             await loadServers();
             showPage('dashboard');
+            initCharts();
+            initLogs();
         } else {
             showPage('landing');
         }
@@ -360,6 +368,181 @@ function escapeHtml(text) {
 
 function formatKey(key) {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function toggleTheme() {
+    const body = document.body;
+    const themeToggle = document.getElementById('theme-toggle');
+
+    body.classList.toggle('light-mode');
+
+    if (body.classList.contains('light-mode')) {
+        themeToggle.textContent = '☀️';
+        localStorage.setItem('theme', 'light');
+    } else {
+        themeToggle.textContent = '🌙';
+        localStorage.setItem('theme', 'dark');
+    }
+
+    updateChartsTheme();
+}
+
+function loadTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const themeToggle = document.getElementById('theme-toggle');
+
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+        if (themeToggle) themeToggle.textContent = '☀️';
+    } else {
+        if (themeToggle) themeToggle.textContent = '🌙';
+    }
+}
+
+let eventsChart = null;
+let activityChart = null;
+
+function initCharts() {
+    const eventsCtx = document.getElementById('events-chart');
+    const activityCtx = document.getElementById('activity-chart');
+
+    if (!eventsCtx || !activityCtx) return;
+
+    const isLightMode = document.body.classList.contains('light-mode');
+    const textColor = isLightMode ? '#1a1a1a' : '#fff';
+    const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+
+    eventsChart = new Chart(eventsCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+            datasets: [{
+                label: 'Eventos Bloqueados',
+                data: [12, 19, 3, 5, 2, 3, 15],
+                backgroundColor: 'rgba(241, 196, 15, 0.6)',
+                borderColor: '#f1c40f',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    labels: { color: textColor }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                }
+            }
+        }
+    });
+
+    activityChart = new Chart(activityCtx, {
+        type: 'line',
+        data: {
+            labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+            datasets: [{
+                label: 'Usuarios Activos',
+                data: [65, 59, 80, 81, 56, 55, 40],
+                borderColor: '#f1c40f',
+                backgroundColor: 'rgba(241, 196, 15, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    labels: { color: textColor }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                }
+            }
+        }
+    });
+}
+
+function updateChartsTheme() {
+    if (!eventsChart || !activityChart) return;
+
+    const isLightMode = document.body.classList.contains('light-mode');
+    const textColor = isLightMode ? '#1a1a1a' : '#fff';
+    const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+
+    [eventsChart, activityChart].forEach(chart => {
+        chart.options.plugins.legend.labels.color = textColor;
+        chart.options.scales.y.ticks.color = textColor;
+        chart.options.scales.y.grid.color = gridColor;
+        chart.options.scales.x.ticks.color = textColor;
+        chart.options.scales.x.grid.color = gridColor;
+        chart.update();
+    });
+}
+
+function initLogs() {
+    const logsContainer = document.getElementById('logs-container');
+    if (!logsContainer) return;
+
+    const sampleLogs = [
+        { type: 'info', message: 'Bot iniciado correctamente' },
+        { type: 'warning', message: 'Detección de actividad sospechosa en usuario #123456' },
+        { type: 'success', message: 'Anti-raid bloqueó 5 usuarios maliciosos' },
+        { type: 'error', message: 'Error al conectar con API de Discord' },
+        { type: 'info', message: 'Backup completado exitosamente' },
+        { type: 'warning', message: 'Intento de nuke detectado y prevenido' },
+        { type: 'success', message: 'Usuario agregado a whitelist' }
+    ];
+
+    sampleLogs.forEach(log => addLogEntry(log));
+
+    setInterval(() => {
+        const randomLogs = [
+            { type: 'info', message: 'Verificación de usuarios en curso...' },
+            { type: 'warning', message: 'Alta actividad de joins detectada' },
+            { type: 'success', message: 'Spam bloqueado: 15 mensajes' },
+            { type: 'info', message: 'Sistema de seguridad activo' }
+        ];
+        const randomLog = randomLogs[Math.floor(Math.random() * randomLogs.length)];
+        addLogEntry(randomLog);
+    }, 5000);
+}
+
+function addLogEntry(log) {
+    const logsContainer = document.getElementById('logs-container');
+    if (!logsContainer) return;
+
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${log.type}`;
+
+    const time = new Date().toLocaleTimeString('es-ES');
+    entry.innerHTML = `
+        <span class="log-time">${time}</span>
+        <span class="log-message">${log.message}</span>
+    `;
+
+    logsContainer.insertBefore(entry, logsContainer.firstChild);
+
+    if (logsContainer.children.length > 50) {
+        logsContainer.removeChild(logsContainer.lastChild);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', init);

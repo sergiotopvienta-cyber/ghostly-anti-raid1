@@ -6,6 +6,7 @@
     <title>Ghostly Guard - Dashboard</title>
     <link rel="icon" type="image/png" href="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png?ex=69dc4abd&is=69daf93d&hm=c8db3c2353d0846612436f6daca0c14fa2d87918659e4de447861bca21fe22c3&=&format=webp&quality=lossless&width=64&height=64">
     <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -17,6 +18,9 @@
             <div class="nav-links">
                 <a href="/" class="nav-link">Inicio</a>
                 <a href="/dashboard" class="nav-link">Dashboard</a>
+            </div>
+            <div class="nav-actions">
+                <button id="theme-toggle" class="btn-icon" title="Cambiar tema">🌙</button>
             </div>
             <div class="nav-auth">
                 <button id="login-btn" class="btn btn-primary">Entrar con Discord</button>
@@ -91,6 +95,25 @@
                 <div class="server-list" id="server-list">
                     <h2>Tus Servidores</h2>
                     <div id="servers-grid" class="servers-grid"></div>
+                </div>
+
+                <div class="analytics-section">
+                    <h2>📊 Estadísticas</h2>
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <h3>Eventos Bloqueados</h3>
+                            <canvas id="events-chart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <h3>Actividad del Servidor</h3>
+                            <canvas id="activity-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="logs-section">
+                    <h2>📜 Logs en Tiempo Real</h2>
+                    <div id="logs-container" class="logs-container"></div>
                 </div>
             </div>
 
