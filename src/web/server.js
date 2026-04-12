@@ -599,15 +599,23 @@ function parseCookies(req) {
 }
 
 function setCookie(res, name, value, options = {}) {
-    const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'SameSite=Lax'];
+    const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/'];
     if (options.maxAge) parts.push(`Max-Age=${options.maxAge}`);
     if (options.httpOnly) parts.push('HttpOnly');
-    if (process.env.NODE_ENV === 'production') parts.push('Secure');
+    if (process.env.NODE_ENV === 'production') {
+        parts.push('Secure');
+        parts.push('SameSite=None');
+    } else {
+        parts.push('SameSite=Lax');
+    }
     appendSetCookie(res, parts.join('; '));
 }
 
 function clearCookie(res, name) {
-    appendSetCookie(res, `${name}=; Path=/; Max-Age=0; SameSite=Lax`);
+    const cookieValue = process.env.NODE_ENV === 'production'
+        ? `${name}=; Path=/; Max-Age=0; SameSite=None; Secure`
+        : `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+    appendSetCookie(res, cookieValue);
 }
 
 function appendSetCookie(res, cookieValue) {

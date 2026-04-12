@@ -8,6 +8,7 @@ async function init() {
     const loginBtn = document.getElementById('login-btn');
     const logoutBtn = document.getElementById('logout-btn');
     const backBtn = document.getElementById('back-btn');
+    const dashboardBtn = document.querySelector('.hero .btn-primary');
 
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
@@ -27,16 +28,13 @@ async function init() {
         });
     }
 
+    const path = window.location.pathname;
+
     try {
         const session = await fetch('/api/session').then(r => r.json());
         state.session = session;
 
-        if (session.authenticated && loginBtn && logoutBtn) {
-            loginBtn.classList.add('hidden');
-            logoutBtn.classList.remove('hidden');
-        }
-
-        const path = window.location.pathname;
+        updateAuthUI(session);
 
         if (path === '/') {
             showPage('landing');
@@ -62,6 +60,41 @@ async function init() {
         showMessage('Error al cargar el dashboard', 'error');
     }
 }
+
+function updateAuthUI(session) {
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const dashboardBtn = document.querySelector('.hero .btn-primary');
+
+    if (!loginBtn || !logoutBtn) return;
+
+    if (session.authenticated) {
+        loginBtn.classList.add('hidden');
+        logoutBtn.classList.remove('hidden');
+        if (dashboardBtn) {
+            dashboardBtn.textContent = 'Ir al Dashboard';
+        }
+    } else {
+        loginBtn.classList.remove('hidden');
+        logoutBtn.classList.add('hidden');
+        if (dashboardBtn) {
+            dashboardBtn.textContent = 'Entrar con Discord';
+        }
+    }
+}
+
+async function refreshSession() {
+    try {
+        const session = await fetch('/api/session').then(r => r.json());
+        state.session = session;
+        updateAuthUI(session);
+    } catch (error) {
+        console.error('Error refreshing session:', error);
+    }
+}
+
+window.addEventListener('popstate', refreshSession);
+setInterval(refreshSession, 30000);
 
 async function loadServers() {
     const serversGrid = document.getElementById('servers-grid');
