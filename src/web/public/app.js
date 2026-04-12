@@ -46,39 +46,26 @@ async function init() {
 
         if (path === '/') {
             showPage('landing');
-            await loadStats();
         } else if (path.startsWith('/dashboard/')) {
+            if (!session.authenticated) {
+                window.location.href = '/auth/login';
+                return;
+            }
             const guildId = path.split('/')[2];
             await loadGuild(guildId);
-        } else {
+        } else if (path === '/dashboard') {
+            if (!session.authenticated) {
+                window.location.href = '/auth/login';
+                return;
+            }
             await loadServers();
             showPage('dashboard');
+        } else {
+            showPage('landing');
         }
     } catch (error) {
         console.error('Init error:', error);
         if (message) showMessage('Error al cargar el dashboard', 'error');
-    }
-}
-
-async function loadStats() {
-    try {
-        const response = await fetch('/api/overview');
-        const data = await response.json();
-
-        const statServers = document.getElementById('stat-servers');
-        const statMembers = document.getElementById('stat-members');
-        const statEvents = document.getElementById('stat-events');
-        const statUptime = document.getElementById('stat-uptime');
-
-        if (statServers) statServers.textContent = data.stats.totalGuilds || 0;
-        if (statMembers) statMembers.textContent = formatNumber(data.stats.totalMembers || 0);
-        if (statEvents) {
-            const totalEvents = data.eventCounts.reduce((sum, item) => sum + item.total, 0);
-            statEvents.textContent = totalEvents || 0;
-        }
-        if (statUptime) statUptime.textContent = (data.stats.uptimeHours || 0) + 'h';
-    } catch (error) {
-        console.error('Error loading stats:', error);
     }
 }
 
@@ -95,7 +82,6 @@ async function loadServers() {
             ? state.guilds.map(guild => `
                 <div class="server-card" onclick="window.location.href='/dashboard/${guild.id}'">
                     <h3>${escapeHtml(guild.name)}</h3>
-                    <p>${guild.memberCount} miembros</p>
                     <small>${guild.accessLevel}</small>
                 </div>
             `).join('')

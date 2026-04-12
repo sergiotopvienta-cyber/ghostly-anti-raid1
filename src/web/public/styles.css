@@ -124,75 +124,6 @@ body {
     margin-bottom: 32px;
 }
 
-.stats-section {
-    margin: 60px 0;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 24px;
-}
-
-.stat-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 24px;
-    text-align: center;
-}
-
-.stat-icon {
-    font-size: 2.5rem;
-    margin-bottom: 12px;
-}
-
-.stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #5865f2;
-    margin-bottom: 8px;
-}
-
-.stat-label {
-    color: #b9bbbe;
-    font-size: 0.9rem;
-}
-
-.features-section {
-    margin: 60px 0;
-}
-
-.features-section h2 {
-    text-align: center;
-    margin-bottom: 32px;
-    font-size: 2rem;
-}
-
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 24px;
-}
-
-.feature-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 24px;
-}
-
-.feature-card h3 {
-    font-size: 1.2rem;
-    margin-bottom: 12px;
-}
-
-.feature-card p {
-    color: #b9bbbe;
-    font-size: 0.95rem;
-    line-height: 1.6;
-}
-
 .server-list h2 {
     margin-bottom: 24px;
 }
@@ -223,12 +154,6 @@ body {
 .server-card h3 {
     margin: 0 0 8px 0;
     font-size: 1.1rem;
-}
-
-.server-card p {
-    margin: 0 0 4px 0;
-    color: #b9bbbe;
-    font-size: 0.9rem;
 }
 
 .server-card small {
