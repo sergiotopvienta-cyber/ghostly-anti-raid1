@@ -11,6 +11,7 @@ async function init() {
     const heroPrimary = document.getElementById('hero-primary');
     const heroSecondary = document.getElementById('hero-secondary');
     const backBtn = document.getElementById('back-btn');
+    const path = window.location.pathname;
 
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
@@ -45,48 +46,46 @@ async function init() {
         });
     }
 
-    try {
-        const session = await fetch('/api/session').then((r) => r.json());
-        state.session = session;
-
-        syncAuthButtons(session);
-        syncHeroActions(session);
-
-        const path = window.location.pathname;
-
-        if (path === '/') {
-            showPage('landing');
-            return;
-        }
-
-        if (path.startsWith('/dashboard/')) {
-            if (!session.authenticated) {
-                window.location.href = '/auth/login';
-                return;
-            }
-
-            const guildId = path.split('/')[2];
-            await loadGuild(guildId);
-            return;
-        }
-
-        if (path === '/dashboard') {
-            if (!session.authenticated) {
-                window.location.href = '/auth/login';
-                return;
-            }
-
-            await loadDashboard();
-            showPage('dashboard');
-            return;
-        }
-
+    if (path === '/') {
         showPage('landing');
-    } catch (error) {
-        console.error('Init error:', error);
-        showMessage('Error al cargar el dashboard', 'error');
+    } else if (path === '/dashboard' || path.startsWith('/dashboard/')) {
+        showPage(path.startsWith('/dashboard/') ? 'guild' : 'dashboard');
+        setLoadingState(path.startsWith('/dashboard/') ? 'guild' : 'dashboard');
+    } else {
         showPage('landing');
     }
+
+    fetch('/api/session')
+        .then((r) => r.json())
+        .then(async (session) => {
+            state.session = session;
+            syncAuthButtons(session);
+            syncHeroActions(session);
+
+            if (path.startsWith('/dashboard/')) {
+                if (!session.authenticated) {
+                    window.location.href = '/auth/login';
+                    return;
+                }
+
+                const guildId = path.split('/')[2];
+                await loadGuild(guildId);
+                return;
+            }
+
+            if (path === '/dashboard') {
+                if (!session.authenticated) {
+                    window.location.href = '/auth/login';
+                    return;
+                }
+
+                await loadDashboard();
+            }
+        })
+        .catch((error) => {
+            console.error('Init error:', error);
+            showMessage('Error al cargar el dashboard', 'error');
+        });
 }
 
 function syncAuthButtons(session) {
@@ -122,27 +121,70 @@ function syncHeroActions(session) {
 
 async function loadDashboard() {
     try {
-        const [overviewResponse, guildsResponse] = await Promise.all([
-            fetch('/api/overview'),
-            fetch('/api/guilds')
-        ]);
+        setLoadingState('dashboard');
 
-        const [overview, guildData] = await Promise.all([
-            overviewResponse.ok ? overviewResponse.json() : Promise.resolve({}),
-            guildsResponse.ok ? guildsResponse.json() : Promise.resolve({ guilds: [] })
-        ]);
-
-        state.overview = overview || {};
+        const guildsResponse = await fetch('/api/guilds');
+        const guildData = guildsResponse.ok ? await guildsResponse.json() : { guilds: [] };
         state.guilds = guildData.guilds || [];
+        renderServers(state.guilds);
+
+        const overviewResponse = await fetch('/api/overview');
+        const overview = overviewResponse.ok ? await overviewResponse.json() : {};
+        state.overview = overview || {};
 
         renderOverview(state.overview);
-        renderServers(state.guilds);
         renderRecentEvents(state.overview.recentEvents || []);
         renderStatus(state.overview);
     } catch (error) {
         console.error('Error loading dashboard:', error);
         showMessage('No se pudo cargar el resumen', 'error');
         await loadServers();
+    }
+}
+
+function setLoadingState(page) {
+    const overviewCards = document.getElementById('overview-cards');
+    const serversGrid = document.getElementById('servers-grid');
+    const recentEvents = document.getElementById('recent-events');
+    const statusList = document.getElementById('status-list');
+    const guildName = document.getElementById('guild-name');
+    const settingsForm = document.getElementById('settings-form');
+
+    if (page === 'dashboard') {
+        if (overviewCards) {
+            overviewCards.innerHTML = `
+                <div class="loading-card"></div>
+                <div class="loading-card"></div>
+                <div class="loading-card"></div>
+                <div class="loading-card"></div>
+            `;
+        }
+        if (serversGrid) {
+            serversGrid.innerHTML = `
+                <div class="loading-card loading-server"></div>
+                <div class="loading-card loading-server"></div>
+                <div class="loading-card loading-server"></div>
+                <div class="loading-card loading-server"></div>
+            `;
+        }
+        if (recentEvents) {
+            recentEvents.innerHTML = '<div class="loading-card loading-line"></div><div class="loading-card loading-line"></div>';
+        }
+        if (statusList) {
+            statusList.innerHTML = '<div class="loading-card loading-line"></div><div class="loading-card loading-line"></div>';
+        }
+    }
+
+    if (page === 'guild') {
+        if (guildName) guildName.textContent = 'Cargando...';
+        if (settingsForm) {
+            settingsForm.innerHTML = `
+                <div class="loading-card loading-form"></div>
+                <div class="loading-card loading-form"></div>
+                <div class="loading-card loading-form"></div>
+                <div class="loading-card loading-form"></div>
+            `;
+        }
     }
 }
 
