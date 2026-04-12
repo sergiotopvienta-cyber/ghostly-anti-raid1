@@ -109,6 +109,7 @@ module.exports = {
         }
 
         await assignVerificationRole(member, settings);
+        await assignAutoRole(member, client);
         await createSecurityEvent(client, member.guild, settings, {
             type: 'MEMBER_JOIN',
             severity: 'info',
@@ -131,5 +132,36 @@ async function assignVerificationRole(member, settings) {
         await member.roles.add(role);
     } catch (error) {
         console.error('Error asignando rol de verificacion:', error.message);
+    }
+}
+
+async function assignAutoRole(member, client) {
+    try {
+        const autoRoleData = await client.db.getAutoRole(member.guild.id);
+        if (!autoRoleData) return;
+
+        const role = member.guild.roles.cache.get(autoRoleData.role_id);
+        if (!role) {
+            console.error(`Rol automático no encontrado: ${autoRoleData.role_id}`);
+            return;
+        }
+
+        if (member.roles.cache.has(autoRoleData.role_id)) return;
+
+        await member.roles.add(role, 'Rol automático asignado por Ghostly Guard');
+        
+        const settings = await client.db.getGuildSettings(member.guild.id);
+        await createSecurityEvent(client, member.guild, settings, {
+            type: 'AUTOROL_ASSIGNED',
+            severity: 'info',
+            title: 'Rol Automático Asignado',
+            color: '#57f287',
+            description: `Se asignó el rol **${role.name}** automáticamente a ${member.user.tag}.`,
+            target: member.user,
+            metadata: { roleId: role.id, roleName: role.name }
+        });
+
+    } catch (error) {
+        console.error('Error asignando rol automático:', error.message);
     }
 }

@@ -266,6 +266,55 @@ async function handleApiRequest(client, req, res, requestUrl) {
             return sendJson(res, 200, { ok: true, filePath });
         }
 
+        const autorolMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/autorol$/);
+        if (autorolMatch) {
+            const guildId = autorolMatch[1];
+            const guild = await requireGuildAccess(client, guildId, session.user.id);
+            if (!guild) {
+                return sendJson(res, 403, { error: 'Sin acceso a este servidor' });
+            }
+
+            if (req.method === 'GET') {
+                const autoRoleData = await client.db.getAutoRole(guildId);
+                return sendJson(res, 200, { 
+                    autorol: autoRoleData ? {
+                        roleId: autoRoleData.role_id,
+                        setBy: autoRoleData.set_by,
+                        setAt: autoRoleData.set_at
+                    } : null 
+                });
+            }
+
+            if (req.method === 'POST') {
+                const { roleId } = body;
+                if (!roleId) {
+                    return sendJson(res, 400, { error: 'Falta roleId' });
+                }
+
+                const role = guild.roles.cache.get(roleId);
+                if (!role) {
+                    return sendJson(res, 400, { error: 'Rol no encontrado' });
+                }
+
+                const member = await guild.members.fetch(session.user.id).catch(() => null);
+                if (!member) {
+                    return sendJson(res, 403, { error: 'No se pudo obtener tu información de miembro' });
+                }
+
+                if (role.position >= member.roles.highest.position && session.user.id !== guild.ownerId) {
+                    return sendJson(res, 403, { error: 'No puedes asignar un rol que esté por encima de tu rol más alto' });
+                }
+
+                await client.db.setAutoRole(guildId, roleId, session.user.id);
+                return sendJson(res, 200, { ok: true, roleId, setBy: session.user.id });
+            }
+
+            if (req.method === 'DELETE') {
+                await client.db.removeAutoRole(guildId);
+                return sendJson(res, 200, { ok: true });
+            }
+        }
+
         return sendJson(res, 404, { error: 'Ruta no encontrada' });
     } catch (error) {
         console.error('Error en API web:', error);

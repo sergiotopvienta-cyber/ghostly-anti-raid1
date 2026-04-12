@@ -143,6 +143,13 @@ class Database {
                 user_id TEXT NOT NULL,
                 content TEXT NOT NULL,
                 message_time DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS autorol (
+                guild_id TEXT PRIMARY KEY,
+                role_id TEXT NOT NULL,
+                set_by TEXT NOT NULL,
+                set_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`
         ];
 
@@ -693,6 +700,54 @@ class Database {
                         reject(err);
                     } else {
                         resolve(rows[0].count);
+                    }
+                }
+            );
+        });
+    }
+
+    setAutoRole(guildId, roleId, setBy) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR REPLACE INTO autorol (guild_id, role_id, set_by) VALUES (?, ?, ?)',
+                [guildId, roleId, setBy],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    getAutoRole(guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM autorol WHERE guild_id = ?',
+                [guildId],
+                (err, row) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row || null);
+                    }
+                }
+            );
+        });
+    }
+
+    removeAutoRole(guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM autorol WHERE guild_id = ?',
+                [guildId],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
                     }
                 }
             );
