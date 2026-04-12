@@ -6,6 +6,7 @@ require('dotenv').config();
 const { ensureWeeklyBackups } = require('./utils/security');
 const Database = require('./utils/database');
 const { createWebServer } = require('./web/server');
+const SnapshotManager = require('./utils/snapshot');
 
 const client = new Client({
     intents: [
@@ -54,6 +55,7 @@ for (const file of eventFiles) {
 }
 
 client.db = new Database();
+client.snapshotManager = new SnapshotManager(client);
 
 client.once(Events.ClientReady, async (readyClient) => {
     console.log(`Ghostly Guard en linea como ${readyClient.user.tag}`);

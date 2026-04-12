@@ -127,6 +127,22 @@ class Database {
                 file_path TEXT NOT NULL,
                 created_by TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS ban_tracking (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                executor_id TEXT NOT NULL,
+                banned_user_id TEXT NOT NULL,
+                ban_time DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS message_content (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                message_time DATETIME DEFAULT CURRENT_TIMESTAMP
             )`
         ];
 
@@ -607,6 +623,71 @@ class Database {
             this.db.all(
                 'SELECT COUNT(*) as count FROM message_tracking WHERE guild_id = ? AND user_id = ? AND message_time > datetime("now", "-' + seconds + ' seconds")',
                 [guildId, userId],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows[0].count);
+                    }
+                }
+            );
+        });
+    }
+
+    logBan(guildId, executorId, bannedUserId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT INTO ban_tracking (guild_id, executor_id, banned_user_id) VALUES (?, ?, ?)',
+                [guildId, executorId, bannedUserId],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    getRecentBans(guildId, executorId, milliseconds = 60000) {
+        return new Promise((resolve, reject) => {
+            const seconds = Math.floor(milliseconds / 1000);
+            this.db.all(
+                'SELECT COUNT(*) as count FROM ban_tracking WHERE guild_id = ? AND executor_id = ? AND ban_time > datetime("now", "-' + seconds + ' seconds")',
+                [guildId, executorId],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows[0].count);
+                    }
+                }
+            );
+        });
+    }
+
+    trackMessageContent(guildId, userId, content) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT INTO message_content (guild_id, user_id, content) VALUES (?, ?, ?)',
+                [guildId, userId, content],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    getDuplicateMessages(guildId, userId, content, seconds = 30) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT COUNT(*) as count FROM message_content WHERE guild_id = ? AND user_id = ? AND content = ? AND message_time > datetime("now", "-' + seconds + ' seconds")',
+                [guildId, userId, content],
                 (err, rows) => {
                     if (err) {
                         reject(err);

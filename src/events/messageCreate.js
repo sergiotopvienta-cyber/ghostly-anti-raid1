@@ -3,6 +3,11 @@ const ms = require('ms');
 
 const { createSecurityEvent, isWhitelisted } = require('../utils/security');
 
+const BANNED_WORDS = ['scam', 'nitro free', 'free nitro', 'steam scam', 'discord scam', 'hack', 'crack', 'exploit'];
+const EMOJI_PATTERN = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+
+const cooldowns = new Map();
+
 module.exports = {
     name: Events.MessageCreate,
     async execute(message, client) {
@@ -15,6 +20,21 @@ module.exports = {
         if (settings.lockdown_active && !bypass) {
             await message.delete().catch(() => null);
             return;
+        }
+
+        if (!bypass) {
+            const cooldownKey = `${message.guild.id}-${message.author.id}`;
+            const now = Date.now();
+            const userCooldown = cooldowns.get(cooldownKey);
+
+            if (userCooldown && now < userCooldown) {
+                const remainingTime = Math.ceil((userCooldown - now) / 1000);
+                return message.reply(`Debes esperar ${remainingTime} segundos antes de enviar otro mensaje.`).then(msg => {
+                    setTimeout(() => msg.delete().catch(() => null), 3000);
+                }).catch(() => null);
+            }
+
+            cooldowns.set(cooldownKey, now + 2000);
         }
 
         await client.db.trackMessage(message.guild.id, message.author.id, message.channel.id);
@@ -59,6 +79,55 @@ module.exports = {
                     duration: '5 minutes',
                     description: `${message.author.tag} envio ${links.length} enlace(s).`,
                     metadata: { links }
+                });
+            }
+        }
+
+        if (!bypass) {
+            await client.db.trackMessageContent(message.guild.id, message.author.id, message.content);
+
+            const duplicateCount = await client.db.getDuplicateMessages(message.guild.id, message.author.id, message.content, 30);
+            if (duplicateCount >= 3) {
+                return handleTimeoutThreat(message, client, settings, {
+                    type: 'DUPLICATE_BLOCKED',
+                    title: 'Contenido duplicado detectado',
+                    color: '#e67e22',
+                    reason: 'Spam de contenido duplicado',
+                    duration: '5 minutes',
+                    description: `${message.author.tag} envio el mismo mensaje ${duplicateCount} veces.`,
+                    metadata: { duplicateCount }
+                });
+            }
+        }
+
+        if (!bypass) {
+            const lowerContent = message.content.toLowerCase();
+            for (const word of BANNED_WORDS) {
+                if (lowerContent.includes(word)) {
+                    return handleTimeoutThreat(message, client, settings, {
+                        type: 'BANNED_WORD_BLOCKED',
+                        title: 'Palabra prohibida detectada',
+                        color: '#c0392b',
+                        reason: 'Contenido prohibido',
+                        duration: '10 minutes',
+                        description: `${message.author.tag} uso una palabra prohibida: ${word}`,
+                        metadata: { bannedWord: word }
+                    });
+                }
+            }
+        }
+
+        if (!bypass) {
+            const emojiMatches = message.content.match(EMOJI_PATTERN);
+            if (emojiMatches && emojiMatches.length > 10) {
+                return handleTimeoutThreat(message, client, settings, {
+                    type: 'EMOJI_SPAM_BLOCKED',
+                    title: 'Spam de emojis detectado',
+                    color: '#f39c12',
+                    reason: 'Spam de emojis',
+                    duration: '5 minutes',
+                    description: `${message.author.tag} envio ${emojiMatches.length} emojis en un solo mensaje.`,
+                    metadata: { emojiCount: emojiMatches.length }
                 });
             }
         }
