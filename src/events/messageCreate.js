@@ -7,11 +7,56 @@ const BANNED_WORDS = ['scam', 'nitro free', 'free nitro', 'steam scam', 'discord
 const EMOJI_PATTERN = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
 
 const cooldowns = new Map();
+const prefix = '!';
+
+function loadPrefixCommands() {
+    const commands = new Map();
+    const fs = require('fs');
+    const path = require('path');
+    
+    const commandsPath = path.join(__dirname, '../commands/prefix');
+    if (fs.existsSync(commandsPath)) {
+        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+        
+        for (const file of commandFiles) {
+            const filePath = path.join(commandsPath, file);
+            const command = require(filePath);
+            commands.set(command.name, command);
+        }
+    }
+    
+    return commands;
+}
+
+const prefixCommands = loadPrefixCommands();
 
 module.exports = {
     name: Events.MessageCreate,
     async execute(message, client) {
         if (message.author.bot || !message.guild) return;
+
+        // Manejar comandos con prefijo
+        if (message.content.startsWith(prefix)) {
+            const args = message.content.slice(prefix.length).trim().split(/ +/);
+            const commandName = args.shift().toLowerCase();
+            const command = prefixCommands.get(commandName);
+
+            if (command) {
+                try {
+                    await command.execute(message, args, client);
+                } catch (error) {
+                    console.error(`Error ejecutando comando ${commandName}:`, error);
+                    const errorEmbed = new EmbedBuilder()
+                        .setTitle('Error')
+                        .setColor('#ed4245')
+                        .setDescription('Hubo un error al ejecutar el comando.')
+                        .setTimestamp();
+                    
+                    await message.reply({ embeds: [errorEmbed] });
+                }
+                return;
+            }
+        }
 
         const settings = await client.db.getGuildSettings(message.guild.id);
         const whitelisted = await isWhitelisted(client, message.guild.id, message.author.id);
