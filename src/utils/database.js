@@ -121,11 +121,9 @@ class Database {
             )`,
 
             `CREATE TABLE IF NOT EXISTS backups (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT PRIMARY KEY,
                 guild_id TEXT NOT NULL,
-                type TEXT NOT NULL DEFAULT 'manual',
-                file_path TEXT NOT NULL,
-                created_by TEXT,
+                data TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`,
 
@@ -150,6 +148,14 @@ class Database {
                 role_id TEXT NOT NULL,
                 set_by TEXT NOT NULL,
                 set_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+
+            `CREATE TABLE IF NOT EXISTS security_stats (
+                guild_id TEXT NOT NULL,
+                stat_type TEXT NOT NULL,
+                count INTEGER DEFAULT 1,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (guild_id, stat_type)
             )`
         ];
 
@@ -768,6 +774,113 @@ class Database {
                         reject(err);
                     } else {
                         resolve(this.changes > 0);
+                    }
+                }
+            );
+        });
+    }
+
+    // Backup functions
+    saveBackup(guildId, backupData) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                `INSERT OR REPLACE INTO backups (id, guild_id, data, created_at) VALUES (?, ?, ?, ?)`,
+                [backupData.id, guildId, JSON.stringify(backupData), backupData.createdAt],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    getBackup(guildId, backupId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM backups WHERE guild_id = ? AND id = ?',
+                [guildId, backupId],
+                (err, row) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row ? JSON.parse(row.data) : null);
+                    }
+                }
+            );
+        });
+    }
+
+    getBackups(guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM backups WHERE guild_id = ? ORDER BY created_at DESC',
+                [guildId],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows ? rows.map(row => JSON.parse(row.data)) : []);
+                    }
+                }
+            );
+        });
+    }
+
+    deleteBackup(guildId, backupId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM backups WHERE guild_id = ? AND id = ?',
+                [guildId, backupId],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
+                    }
+                }
+            );
+        });
+    }
+
+    // Security stats functions
+    incrementSecurityStat(guildId, statType) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                `INSERT INTO security_stats (guild_id, stat_type, count, updated_at) 
+                 VALUES (?, ?, 1, datetime('now')) 
+                 ON CONFLICT(guild_id, stat_type) 
+                 DO UPDATE SET count = count + 1, updated_at = datetime('now')`,
+                [guildId, statType],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                }
+            );
+        });
+    }
+
+    getSecurityStats(guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT stat_type, count FROM security_stats WHERE guild_id = ?',
+                [guildId],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        const stats = {};
+                        if (rows) {
+                            rows.forEach(row => {
+                                stats[row.stat_type] = row.count;
+                            });
+                        }
+                        resolve(stats);
                     }
                 }
             );
