@@ -707,10 +707,11 @@ class Database {
     }
 
     setAutoRole(guildId, roleId, setBy) {
+        const actorId = setBy || 'system';
         return new Promise((resolve, reject) => {
             this.db.run(
                 'INSERT OR REPLACE INTO autorol (guild_id, role_id, set_by) VALUES (?, ?, ?)',
-                [guildId, roleId, setBy],
+                [guildId, roleId, actorId],
                 function(err) {
                     if (err) {
                         reject(err);

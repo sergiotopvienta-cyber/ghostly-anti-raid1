@@ -67,6 +67,34 @@ async function setAutoRole(interaction, client) {
         return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
     }
 
+    const botMember = interaction.guild.members.me;
+    if (!botMember) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Error')
+            .setColor('#ed4245')
+            .setDescription('No pude obtener la información del bot en el servidor.')
+            .setTimestamp();
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
+
+    if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Error')
+            .setColor('#ed4245')
+            .setDescription('No tengo el permiso **Gestionar Roles**. Actívalo para poder asignar el rol automáticamente.')
+            .setTimestamp();
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
+
+    if (role.position >= botMember.roles.highest.position) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Error')
+            .setColor('#ed4245')
+            .setDescription('Ese rol está por encima (o igual) al rol más alto del bot. Sube el rol del bot por encima para que pueda asignarlo.')
+            .setTimestamp();
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
+
     try {
         await client.db.setAutoRole(interaction.guild.id, role.id, interaction.user.id);
 
@@ -98,7 +126,7 @@ async function setAutoRole(interaction, client) {
         const errorEmbed = new EmbedBuilder()
             .setTitle('Error')
             .setColor('#ed4245')
-            .setDescription('Hubo un error al configurar el rol automático. Por favor, intenta de nuevo.')
+            .setDescription(`Hubo un error al configurar el rol automático.\n\nDetalle: ${String(error?.message || error)}`)
             .setTimestamp();
         
         await interaction.reply({ embeds: [errorEmbed], ephemeral: true });

@@ -553,7 +553,7 @@ async function setupAutoRole(guildId, roles) {
     const removeBtn = document.getElementById('remove-autorol-btn');
     const infoBox = document.getElementById('autorol-info');
 
-    if (!statusDiv) return;
+    if (!statusDiv || !select || !setBtn || !removeBtn || !infoBox) return;
 
     try {
         const response = await fetch(`/api/guilds/${guildId}/autorol`);
@@ -561,7 +561,10 @@ async function setupAutoRole(guildId, roles) {
 
         // Cargar roles en el select
         select.innerHTML = '<option value="">Seleccionar rol...</option>' +
-            roles.map(role => `<option value="${role.id}">${escapeHtml(role.name)}</option>`).join('');
+            roles
+                .filter(r => r && r.id && r.name)
+                .map(role => `<option value="${role.id}">${escapeHtml(role.name)}</option>`)
+                .join('');
 
         if (data.autorol) {
             statusDiv.innerHTML = '<p style="color: #57f287;">Rol automático está configurado</p>';
@@ -569,9 +572,12 @@ async function setupAutoRole(guildId, roles) {
             infoBox.style.display = 'block';
             removeBtn.style.display = 'inline-block';
             
-            document.getElementById('current-role').textContent = `<@&${data.autorol.roleId}>`;
-            document.getElementById('set-by').textContent = `<@${data.autorol.setBy}>`;
-            document.getElementById('set-date').textContent = new Date(data.autorol.setAt).toLocaleDateString('es-ES');
+            const currentRole = document.getElementById('current-role');
+            const setBy = document.getElementById('set-by');
+            const setDate = document.getElementById('set-date');
+            if (currentRole) currentRole.textContent = data.autorol.roleId;
+            if (setBy) setBy.textContent = data.autorol.setBy;
+            if (setDate) setDate.textContent = new Date(data.autorol.setAt).toLocaleString('es-ES');
         } else {
             statusDiv.innerHTML = '<p style="color: #faa61a;">No hay rol automático configurado</p>';
             infoBox.style.display = 'none';
@@ -582,8 +588,15 @@ async function setupAutoRole(guildId, roles) {
         statusDiv.innerHTML = '<p style="color: #ed4245;">Error al cargar estado del rol automático</p>';
     }
 
+    const autorolForm = document.getElementById('autorol-form');
+    if (!autorolForm) return;
+
+    // Evitar duplicar listeners cuando se refresca
+    if (autorolForm.dataset.bound === '1') return;
+    autorolForm.dataset.bound = '1';
+
     // Event listeners
-    document.getElementById('autorol-form').addEventListener('submit', async (e) => {
+    autorolForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const roleId = select.value;
         
