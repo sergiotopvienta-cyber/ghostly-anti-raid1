@@ -27,7 +27,7 @@ console.log(`Client ID: ${CLIENT_ID}`);
 // Cargar todos los comandos
 const commandsByName = new Map();
 const foldersPath = path.join(__dirname, 'src', 'commands');
-const commandFolders = fs.readdirSync(foldersPath);
+const commandFolders = fs.readdirSync(foldersPath).filter((folder) => folder !== 'prefix');
 
 console.log('\nCargando comandos...');
 

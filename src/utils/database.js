@@ -153,15 +153,17 @@ class Database {
             )`
         ];
 
-        tables.forEach(table => {
-            this.db.run(table, (err) => {
-                if (err) {
-                    console.error('Error al crear tabla:', err.message);
-                }
+        this.db.serialize(() => {
+            tables.forEach((table) => {
+                this.db.run(table, (err) => {
+                    if (err) {
+                        console.error('Error al crear tabla:', err.message);
+                    }
+                });
             });
-        });
 
-        this.runMigrations();
+            this.runMigrations();
+        });
     }
 
     runMigrations() {

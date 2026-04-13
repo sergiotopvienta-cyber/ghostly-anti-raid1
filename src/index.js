@@ -1,5 +1,6 @@
-const { Client, GatewayIntentBits, Collection, Events, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Events, ActivityType, REST, Routes } = require('discord.js');
 const fs = require('fs');
+const path = require('path');
 const http = require('node:http');
 require('dotenv').config();
 
@@ -57,6 +58,50 @@ for (const file of eventFiles) {
 client.db = new Database();
 client.snapshotManager = new SnapshotManager(client);
 
+async function registerGuildCommands(client) {
+    const token = process.env.DISCORD_TOKEN;
+    const clientId = process.env.CLIENT_ID || client.application?.id;
+
+    if (!token || !clientId) {
+        console.error('No se pudo registrar comandos por servidor: faltan DISCORD_TOKEN o CLIENT_ID');
+        return;
+    }
+
+    const commandsByName = new Map();
+    const foldersPath = path.join(__dirname, 'commands');
+    const commandFolders = fs.readdirSync(foldersPath).filter((folder) => folder !== 'prefix');
+
+    for (const folder of commandFolders) {
+        const commandsPath = path.join(foldersPath, folder);
+        const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
+
+        for (const file of commandFiles) {
+            const filePath = path.join(commandsPath, file);
+            try {
+                delete require.cache[require.resolve(filePath)];
+                const command = require(filePath);
+                if (!('data' in command) || !('execute' in command)) continue;
+                const json = command.data.toJSON();
+                commandsByName.set(json.name, json);
+            } catch (error) {
+                console.error(`Error cargando comando ${filePath}:`, error.message);
+            }
+        }
+    }
+
+    const commands = [...commandsByName.values()];
+    const rest = new REST().setToken(token);
+
+    for (const [, guild] of client.guilds.cache) {
+        try {
+            await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: commands });
+            await new Promise((resolve) => setTimeout(resolve, 1100));
+        } catch (error) {
+            console.error(`Error registrando comandos en guild ${guild.id}:`, error.message);
+        }
+    }
+}
+
 client.once(Events.ClientReady, async (readyClient) => {
     console.log(`Ghostly Guard en linea como ${readyClient.user.tag}`);
 
@@ -76,6 +121,8 @@ client.once(Events.ClientReady, async (readyClient) => {
     for (const [, guild] of client.guilds.cache) {
         await client.db.ensureGuildSettings(guild.id);
     }
+
+    await registerGuildCommands(client);
 
     await ensureWeeklyBackups(client);
     setInterval(() => {

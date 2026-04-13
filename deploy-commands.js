@@ -6,7 +6,7 @@ require('dotenv').config();
 
 const commandsByName = new Map();
 const foldersPath = path.join(__dirname, 'src', 'commands');
-const commandFolders = fs.readdirSync(foldersPath);
+const commandFolders = fs.readdirSync(foldersPath).filter((folder) => folder !== 'prefix');
 
 console.log('Cargando comandos desde:', foldersPath);
 console.log('Carpetas encontradas:', commandFolders);
