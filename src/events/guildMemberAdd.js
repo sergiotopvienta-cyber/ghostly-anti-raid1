@@ -9,6 +9,15 @@ const {
     isVerifiedDiscordBot
 } = require('../utils/security');
 
+// Patrones sospechosos de nombres de usuario (bots coordinados)
+const SUSPICIOUS_PATTERNS = [
+    /\d{4,}$/, // Termina con 4+ números (ej: usuario1234)
+    /^[a-z]+\d{3,}$/i, // Letras + 3+ números (ej: abc123)
+    /(.{2,})\1{2,}/i, // Caracteres repetidos (ej: aaa, bbb)
+    /(free|nitro|gift|steam|discord|giveaway|prize|winner|claim)/i, // Palabras de scam
+    /[\u{1F300}-\u{1F9FF}]/u, // Emojis en nombre (bots de spam)
+];
+
 module.exports = {
     name: Events.GuildMemberAdd,
     async execute(member, client) {
@@ -104,6 +113,30 @@ module.exports = {
                 description: `${member.user.tag} fue expulsado por tener una cuenta de ${accountAge} dias.`,
                 target: member.user,
                 metadata: { accountAge, minRequired: settings.min_account_age_days }
+            });
+            return;
+        }
+
+        // Detección de nombres sospechosos (bots/scam)
+        const suspiciousScore = SUSPICIOUS_PATTERNS.reduce((score, pattern) => {
+            return score + (pattern.test(member.user.username) ? 1 : 0);
+        }, 0);
+
+        if (suspiciousScore >= 2) {
+            try {
+                await member.kick('Nombre de usuario sospechoso detectado');
+            } catch (error) {
+                console.error('Error expulsando usuario con nombre sospechoso:', error.message);
+            }
+
+            await createSecurityEvent(client, member.guild, settings, {
+                type: 'SUSPICIOUS_NAME_BLOCKED',
+                severity: 'medium',
+                title: 'Nombre sospechoso detectado',
+                color: '#e67e22',
+                description: `${member.user.tag} fue expulsado por tener un nombre sospechoso de spam/bot.`,
+                target: member.user,
+                metadata: { username: member.user.username, suspiciousScore }
             });
             return;
         }

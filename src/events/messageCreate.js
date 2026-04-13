@@ -69,16 +69,25 @@ module.exports = {
         }
 
         if (!bypass && settings.anti_links) {
-            const links = message.content.match(/(https?:\/\/[^\s]+|discord\.gg\/[^\s]+|discord\.com\/invite\/[^\s]+|discord\.com\/developers\/invite\/[^\s]+|www\.[^\s]+|[a-z0-9]+\.[a-z]{2,}(?:\/[^\s]*)?)/gi);
-            if (links?.length) {
+            // Regex mejorado: detecta más variantes de invites y links sospechosos
+            const linkRegex = /(https?:\/\/[^\s]+|discord\.gg\/[^\s]+|discord\.com\/invite\/[^\s]+|discordapp\.com\/invite\/[^\s]+|discord\.me\/[^\s]+|invite\.gg\/[^\s]+|d\.gg\/[^\s]+|dis\.gd\/[^\s]+|discord\.link\/[^\s]+|bit\.ly\/[^\s]+|tinyurl\.com\/[^\s]+|t\.ly\/[^\s]+|is\.gd\/[^\s]+|short\.link\/[^\s]+|rb\.gy\/[^\s]+|clck\.ru\/[^\s]+|tiny\.cc\/[^\s]+|cutt\.ly\/[^\s]+|www\.[^\s]+|[a-z0-9]+\.[a-z]{2,}(?:\/[^\s]*)?)/gi;
+            const links = message.content.match(linkRegex);
+            
+            // Filtro adicional: detectar "discord" seguido de cualquier cosa que parezca invite
+            const suspiciousDiscord = message.content.match(/(discord\.(gg|com|me|link|app)|invite\.gg|d\.gg|dis\.gd)\/[^\s]+/gi);
+            
+            const allLinks = [...(links || []), ...(suspiciousDiscord || [])];
+            const uniqueLinks = [...new Set(allLinks)];
+            
+            if (uniqueLinks.length > 0) {
                 return handleTimeoutThreat(message, client, settings, {
                     type: 'LINK_BLOCKED',
                     title: 'Enlaces bloqueados',
                     color: '#9b59b6',
                     reason: 'Enlaces no permitidos',
                     duration: '5 minutes',
-                    description: `${message.author.tag} envio ${links.length} enlace(s).`,
-                    metadata: { links }
+                    description: `${message.author.tag} envio ${uniqueLinks.length} enlace(s) no permitido(s).`,
+                    metadata: { links: uniqueLinks }
                 });
             }
         }

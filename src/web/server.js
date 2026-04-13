@@ -492,6 +492,13 @@ async function buildAllowedGuildList(client, viewerUserId) {
             name: guild.name,
             icon: guild.iconURL(),
             memberCount: guild.memberCount || 0,
+            settings: {
+                anti_raid: Boolean(settings.anti_raid),
+                anti_nuke: Boolean(settings.anti_nuke),
+                anti_links: Boolean(settings.anti_links),
+                anti_bots: Boolean(settings.anti_bots),
+                lockdown_active: Boolean(settings.lockdown_active)
+            },
             features: {
                 antiRaid: Boolean(settings.anti_raid),
                 antiNuke: Boolean(settings.anti_nuke),

@@ -102,28 +102,76 @@ async function refreshSession() {
 }
 
 window.addEventListener('popstate', refreshSession);
-setInterval(refreshSession, 30000);
+setInterval(refreshSession, 60000); // Más eficiente: 60s en lugar de 30s
 
 async function loadServers() {
     const serversGrid = document.getElementById('servers-grid');
+    const serverCount = document.getElementById('server-count');
+    const totalServersEl = document.getElementById('total-servers');
+    
     if (!serversGrid) return;
 
     try {
+        showLoading(true);
         const response = await fetch('/api/guilds');
         const data = await response.json();
         state.guilds = data.guilds || [];
 
-        serversGrid.innerHTML = state.guilds.length
-            ? state.guilds.map(guild => `
-                <div class="server-card" onclick="window.location.href='/dashboard/${guild.id}'">
-                    <h3>${escapeHtml(guild.name)}</h3>
-                    <small>${escapeHtml(guild.accessLevel)}</small>
+        // Update stats
+        if (serverCount) serverCount.textContent = `${state.guilds.length} servidor${state.guilds.length !== 1 ? 'es' : ''}`;
+        if (totalServersEl) totalServersEl.textContent = state.guilds.length;
+
+        // Calculate protected servers (those with anti_raid enabled)
+        const protectedCount = state.guilds.filter(g => g.settings?.anti_raid).length;
+        const protectedEl = document.getElementById('protected-servers');
+        if (protectedEl) protectedEl.textContent = protectedCount;
+
+        // Render servers with new design
+        serversGrid.className = 'servers-grid-modern';
+        serversGrid.innerHTML = state.guilds.length === 0
+            ? `
+                <div class="empty-state-modern">
+                    <span class="empty-icon">🖥️</span>
+                    <h3>No hay servidores</h3>
+                    <p>Agrega Ghostly Guard a un servidor para comenzar</p>
+                    <a href="https://discord.com/oauth2/authorize?client_id=${state.session?.user?.id || 'YOUR_CLIENT_ID'}&scope=bot&permissions=8" 
+                       class="btn btn-primary" target="_blank">Invitar Bot</a>
                 </div>
-            `).join('')
-            : '<p class="empty">No tienes servidores disponibles</p>';
+            `
+            : state.guilds.map(guild => {
+                const isProtected = guild.settings?.anti_raid;
+                const statusIcon = isProtected ? '🛡️' : '⚠️';
+                const statusClass = isProtected ? 'protected' : 'unprotected';
+                
+                return `
+                <div class="server-card-modern ${statusClass}" data-guild="${guild.id}" onclick="loadGuild('${guild.id}')">
+                    <div class="server-status-badge">${statusIcon}</div>
+                    <img src="${guild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'}" 
+                         alt="${guild.name}" 
+                         class="server-icon-modern">
+                    <div class="server-info-modern">
+                        <div class="server-name-modern">${guild.name}</div>
+                        <div class="server-meta">
+                            <span class="server-status ${statusClass}">${isProtected ? 'Protegido' : 'Sin protección'}</span>
+                        </div>
+                    </div>
+                    <div class="server-arrow">→</div>
+                </div>
+            `}).join('');
+            
+        showLoading(false);
     } catch (error) {
         console.error('Error loading servers:', error);
-        showMessage('Error al cargar servidores', 'error');
+        showLoading(false);
+        serversGrid.innerHTML = `
+            <div class="error-state-modern">
+                <span class="error-icon">⚠️</span>
+                <h3>Error al cargar</h3>
+                <p>No se pudieron cargar tus servidores</p>
+                <button class="btn btn-primary" onclick="loadServers()">Reintentar</button>
+            </div>
+        `;
+        showToast('Error', 'No se pudieron cargar los servidores', 'error');
     }
 }
 
@@ -139,17 +187,19 @@ async function loadGuild(guildId) {
         guildName.textContent = data.guild.name;
 
         renderSettingsForm(data.settings);
+        renderSecurityStatus(data.settings);
         renderList('owners-list', data.owners, 'owner');
         renderList('whitelist-list', data.whitelist, 'whitelist');
         renderList('bots-list', data.bots, 'bot');
         renderList('bans-list', data.bans, 'ban');
 
+        setupTabs();
         setupAutoRole(guildId, data.roles || []);
         setupForms(guildId);
         showPage('guild');
     } catch (error) {
         console.error('Error loading guild:', error);
-        showMessage('No tienes acceso a este servidor', 'error');
+        showToast('Error', 'No tienes acceso a este servidor', 'error');
         window.location.href = '/dashboard';
     }
 }
@@ -236,9 +286,9 @@ async function handleAdd(e, guildId, type) {
 
         input.value = '';
         await loadGuild(guildId);
-        showMessage('Agregado correctamente', 'success');
+        showToast('Agregado correctamente', 'success');
     } catch (error) {
-        showMessage('Error al agregar', 'error');
+        showToast('Error al agregar', 'error');
     }
 }
 
@@ -259,9 +309,9 @@ async function handleBan(e, guildId) {
         document.getElementById('ban-input').value = '';
         document.getElementById('ban-reason').value = '';
         await loadGuild(guildId);
-        showMessage('Ban agregado', 'success');
+        showToast('Ban agregado', 'success');
     } catch (error) {
-        showMessage('Error al agregar ban', 'error');
+        showToast('Error al agregar ban', 'error');
     }
 }
 
@@ -313,9 +363,9 @@ async function saveSettings() {
             body: JSON.stringify(payload)
         });
 
-        showMessage('Configuración guardada', 'success');
+        showToast('Configuración guardada', 'success');
     } catch (error) {
-        showMessage('Error al guardar', 'error');
+        showToast('Error al guardar', 'error');
     }
 }
 
@@ -328,9 +378,9 @@ async function removeItem(type, id) {
         });
 
         await loadGuild(state.guildDetail.guild.id);
-        showMessage('Eliminado correctamente', 'success');
+        showToast('Eliminado correctamente', 'success');
     } catch (error) {
-        showMessage('Error al eliminar', 'error');
+        showToast('Error al eliminar', 'error');
     }
 }
 
@@ -348,17 +398,45 @@ function showPage(page) {
     if (page === 'guild' && guildPage) guildPage.classList.remove('hidden');
 }
 
-function showMessage(text, type = 'success') {
-    const message = document.getElementById('message');
-    if (!message) return;
+function showToast(title, message, type = 'info', duration = 5000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
 
-    message.textContent = text;
-    message.className = `message ${type}`;
-    message.classList.remove('hidden');
+    const icons = {
+        success: '✅',
+        error: '❌',
+        info: 'ℹ️'
+    };
 
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type]}</span>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto-remove after duration
     setTimeout(() => {
-        message.classList.add('hidden');
-    }, 3000);
+        toast.style.animation = 'slideIn 0.3s ease reverse';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+function showLoading(show = true) {
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    
+    if (show) {
+        overlay.classList.remove('hidden');
+    } else {
+        overlay.classList.add('hidden');
+    }
 }
 
 function escapeHtml(text) {
@@ -643,6 +721,58 @@ async function setupAutoRole(guildId, roles) {
         } catch (error) {
             console.error('Error removing autorol:', error);
             showMessage('Error al eliminar rol automático', 'error');
+        }
+    });
+}
+
+function setupTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabId = btn.dataset.tab;
+            
+            // Desactivar todas las tabs
+            tabButtons.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            // Activar la tab seleccionada
+            btn.classList.add('active');
+            const targetContent = document.getElementById(`tab-${tabId}`);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
+}
+
+function renderSecurityStatus(settings) {
+    const container = document.getElementById('security-status');
+    if (!container) return;
+    
+    const features = [
+        { key: 'anti_raid', label: 'Anti-Raid', icon: '🛡️' },
+        { key: 'anti_nuke', label: 'Anti-Nuke', icon: '🔒' },
+        { key: 'anti_links', label: 'Anti-Links', icon: '🔗' },
+        { key: 'anti_bots', label: 'Anti-Bots', icon: '🤖' }
+    ];
+    
+    const items = container.querySelectorAll('.status-item');
+    items.forEach(item => {
+        const featureKey = item.dataset.feature;
+        const feature = features.find(f => f.key === featureKey);
+        if (!feature) return;
+        
+        const isEnabled = settings[featureKey];
+        const valueSpan = item.querySelector('.status-value');
+        
+        if (isEnabled) {
+            item.classList.add('enabled');
+            valueSpan.textContent = 'Activado';
+        } else {
+            item.classList.remove('enabled');
+            valueSpan.textContent = 'Desactivado';
         }
     });
 }
