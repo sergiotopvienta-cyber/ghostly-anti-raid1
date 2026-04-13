@@ -4,7 +4,7 @@
   "description": "Bot anti-raid para Discord similar a XNProtect",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node -e \"(async () => { if (process.env.REGISTER_COMMANDS === '1') { await import('./deploy-railway.js'); } await import('./src/index.js'); })().catch(e => { console.error(e); process.exit(1); });\"",
     "dev": "nodemon src/index.js",
     "deploy-commands": "node deploy-commands.js"
   },
