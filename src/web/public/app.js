@@ -289,6 +289,7 @@ async function loadGuild(guildId) {
         renderList('whitelist-list', data.whitelist, 'whitelist');
         renderList('bots-list', data.bots, 'bot');
         renderList('bans-list', data.bans, 'ban');
+        renderList('newaccount-list', data.newaccounts, 'newaccount');
 
         setupTabs();
         setupAutoRole(guildId, data.roles || []);
@@ -372,11 +373,13 @@ function setupForms(guildId) {
     const whitelistForm = document.getElementById('whitelist-form');
     const botForm = document.getElementById('bot-form');
     const banForm = document.getElementById('ban-form');
+    const newAccountForm = document.getElementById('newaccount-form');
 
     if (ownerForm) ownerForm.onsubmit = (e) => handleAdd(e, guildId, 'owners');
     if (whitelistForm) whitelistForm.onsubmit = (e) => handleAdd(e, guildId, 'whitelist');
     if (botForm) botForm.onsubmit = (e) => handleAdd(e, guildId, 'bots');
     if (banForm) banForm.onsubmit = (e) => handleBan(e, guildId);
+    if (newAccountForm) newAccountForm.onsubmit = (e) => handleNewAccount(e, guildId);
 }
 
 async function handleAdd(e, guildId, type) {
@@ -403,8 +406,10 @@ async function handleAdd(e, guildId, type) {
 
 async function handleBan(e, guildId) {
     e.preventDefault();
-    const userId = document.getElementById('ban-input').value.trim();
-    const reason = document.getElementById('ban-reason').value.trim();
+    const input = document.getElementById('ban-input');
+    const reasonInput = document.getElementById('ban-reason');
+    const userId = input.value.trim();
+    const reason = reasonInput.value.trim();
 
     if (!userId) return;
 
@@ -421,6 +426,32 @@ async function handleBan(e, guildId) {
         showToast('Ban agregado', 'success');
     } catch (error) {
         showToast('Error al agregar ban', 'error');
+    }
+}
+
+async function handleNewAccount(e, guildId) {
+    e.preventDefault();
+    const input = document.getElementById('newaccount-input');
+    const userId = input.value.trim();
+
+    if (!userId) {
+        showToast('Ingresa un ID de usuario', 'error');
+        return;
+    }
+
+    try {
+        await fetch(`/api/guilds/${guildId}/newaccounts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+
+        input.value = '';
+        await loadGuild(guildId);
+        showToast('Cuenta nueva autorizada', 'El usuario puede entrar con cuenta recien creada', 'success');
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al autorizar cuenta', 'error');
     }
 }
 

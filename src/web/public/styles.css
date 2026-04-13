@@ -2337,3 +2337,35 @@ body.light-mode .log-message {
     box-shadow: 0 0 0 3px rgba(237, 66, 69, 0.2);
 }
 
+/* Section Highlight - Cuentas Nuevas */
+.section-highlight {
+    background: linear-gradient(135deg, rgba(241, 196, 15, 0.08) 0%, rgba(241, 196, 15, 0.03) 100%);
+    border: 2px solid rgba(241, 196, 15, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+}
+
+.section-highlight::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #f1c40f 0%, #f39c12 100%);
+    border-radius: 16px 0 0 16px;
+}
+
+.section-highlight h3 {
+    color: #f1c40f;
+    border-bottom-color: rgba(241, 196, 15, 0.4);
+}
+
+.section-desc {
+    color: #b9bbbe;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    margin-top: -8px;
+}
+

@@ -98,7 +98,10 @@ module.exports = {
             return;
         }
 
-        if (settings.anti_alts && accountAge < settings.min_account_age_days) {
+        // Bypass anti-alt para usuarios autorizados con cuentas nuevas
+        const isAuthorizedNewAccount = await client.db.isTrustedUser(member.guild.id, member.user.id, 'newaccount');
+        
+        if (settings.anti_alts && accountAge < settings.min_account_age_days && !isAuthorizedNewAccount) {
             try {
                 await member.kick(`Cuenta muy nueva: ${accountAge} dias`);
             } catch (error) {

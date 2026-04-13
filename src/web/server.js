@@ -285,7 +285,7 @@ async function handleApiRequest(client, req, res, requestUrl) {
             return sendJson(res, 200, { ok: true });
         }
 
-        const listMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/(whitelist|bots|bans|owners)$/);
+        const listMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/(whitelist|bots|bans|owners|newaccounts)$/);
         if (listMatch) {
             const guildId = listMatch[1];
             const section = listMatch[2];
@@ -300,7 +300,7 @@ async function handleApiRequest(client, req, res, requestUrl) {
             }
         }
 
-        const sectionDeleteMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/(whitelist|bots|bans|owners)\/(\d+)$/);
+        const sectionDeleteMatch = requestUrl.pathname.match(/^\/api\/guilds\/(\d+)\/(whitelist|bots|bans|owners|newaccounts)\/(\d+)$/);
         if (sectionDeleteMatch && req.method === 'DELETE') {
             const guildId = sectionDeleteMatch[1];
             const section = sectionDeleteMatch[2];
@@ -429,6 +429,15 @@ async function handleSectionCreate(client, guild, viewerUserId, section, body, r
         return sendJson(res, 200, { ok: true });
     }
 
+    if (section === 'newaccounts') {
+        if (!body.userId) {
+            return sendJson(res, 400, { error: 'Falta userId' });
+        }
+
+        await client.db.addTrustedUser(guild.id, body.userId, 'newaccount', viewerUserId);
+        return sendJson(res, 200, { ok: true });
+    }
+
     return sendJson(res, 400, { error: 'Seccion no soportada' });
 }
 
@@ -454,6 +463,11 @@ async function handleSectionDelete(client, guild, viewerUserId, section, targetI
 
     if (section === 'bans') {
         await client.db.removePermanentBan(guild.id, targetId);
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (section === 'newaccounts') {
+        await client.db.removeTrustedUser(guild.id, targetId, 'newaccount');
         return sendJson(res, 200, { ok: true });
     }
 
@@ -581,7 +595,7 @@ async function buildGuildDetail(client, guildId, viewerUserId) {
     if (!accessLevel) return null;
 
     // Parallel queries for all data
-    const [settings, recentEvents, whitelist, owners, bots, bans, backups, severities] = await Promise.all([
+    const [settings, recentEvents, whitelist, owners, bots, bans, backups, severities, newaccounts] = await Promise.all([
         client.db.getGuildSettings(guildId),
         client.db.getRecentSecurityEvents(guildId, 10), // Reduced from 16 to 10
         client.db.listTrustedUsers(guildId, 'whitelist'),
@@ -589,7 +603,8 @@ async function buildGuildDetail(client, guildId, viewerUserId) {
         client.db.listTrustedUsers(guildId, 'bot'),
         client.db.listPermanentBans(guildId),
         client.db.listBackups(guildId, 5), // Reduced from 8 to 5
-        client.db.getSecurityEventCounts(guildId)
+        client.db.getSecurityEventCounts(guildId),
+        client.db.listTrustedUsers(guildId, 'newaccount')
     ]);
 
     return {
@@ -607,7 +622,8 @@ async function buildGuildDetail(client, guildId, viewerUserId) {
             owners: owners.length,
             authorizedBots: bots.length,
             permanentBans: bans.length,
-            backups: backups.length
+            backups: backups.length,
+            newaccounts: newaccounts.length
         },
         severityCounts: severities,
         recentEvents,
@@ -616,6 +632,7 @@ async function buildGuildDetail(client, guildId, viewerUserId) {
         bots,
         bans,
         backups,
+        newaccounts,
         roles: guild.roles.cache.map(role => ({
             id: role.id,
             name: role.name,
