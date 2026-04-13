@@ -144,9 +144,27 @@
                         <div id="whitelist-list" class="list"></div>
                     </div>
                     <div class="section">
+                        <h3>Rol Automático</h3>
+                        <div id="autorol-status" class="status-info">
+                            <p>Cargando estado del rol automático...</p>
+                        </div>
+                        <form id="autorol-form" class="add-form">
+                            <select id="autorol-select" class="form-select">
+                                <option value="">Seleccionar rol...</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary" id="set-autorol-btn">Establecer Rol</button>
+                            <button type="button" class="btn btn-danger" id="remove-autorol-btn" style="display: none;">Eliminar Rol</button>
+                        </form>
+                        <div id="autorol-info" class="info-box" style="display: none;">
+                            <p><strong>Rol actual:</strong> <span id="current-role"></span></p>
+                            <p><strong>Configurado por:</strong> <span id="set-by"></span></p>
+                            <p><strong>Fecha:</strong> <span id="set-date"></span></p>
+                        </div>
+                    </div>
+                    <div class="section">
                         <h3>Bots Autorizados</h3>
                         <form id="bot-form" class="add-form">
-                            <input type="text" id="bot-input" placeholder="ID del bot">
+                            <input type="text" id="bot-input" placeholder="ID de bot">
                             <button type="submit" class="btn btn-primary">Agregar</button>
                         </form>
                         <div id="bots-list" class="list"></div>

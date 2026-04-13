@@ -144,6 +144,7 @@ async function loadGuild(guildId) {
         renderList('bots-list', data.bots, 'bot');
         renderList('bans-list', data.bans, 'ban');
 
+        setupAutoRole(guildId, data.roles || []);
         setupForms(guildId);
         showPage('guild');
     } catch (error) {
@@ -543,6 +544,94 @@ function addLogEntry(log) {
     if (logsContainer.children.length > 50) {
         logsContainer.removeChild(logsContainer.lastChild);
     }
+}
+
+async function setupAutoRole(guildId, roles) {
+    const statusDiv = document.getElementById('autorol-status');
+    const select = document.getElementById('autorol-select');
+    const setBtn = document.getElementById('set-autorol-btn');
+    const removeBtn = document.getElementById('remove-autorol-btn');
+    const infoBox = document.getElementById('autorol-info');
+
+    if (!statusDiv) return;
+
+    try {
+        const response = await fetch(`/api/guilds/${guildId}/autorol`);
+        const data = await response.json();
+
+        // Cargar roles en el select
+        select.innerHTML = '<option value="">Seleccionar rol...</option>' +
+            roles.map(role => `<option value="${role.id}">${escapeHtml(role.name)}</option>`).join('');
+
+        if (data.autorol) {
+            statusDiv.innerHTML = '<p style="color: #57f287;">Rol automático está configurado</p>';
+            select.value = data.autorol.roleId;
+            infoBox.style.display = 'block';
+            removeBtn.style.display = 'inline-block';
+            
+            document.getElementById('current-role').textContent = `<@&${data.autorol.roleId}>`;
+            document.getElementById('set-by').textContent = `<@${data.autorol.setBy}>`;
+            document.getElementById('set-date').textContent = new Date(data.autorol.setAt).toLocaleDateString('es-ES');
+        } else {
+            statusDiv.innerHTML = '<p style="color: #faa61a;">No hay rol automático configurado</p>';
+            infoBox.style.display = 'none';
+            removeBtn.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading autorol:', error);
+        statusDiv.innerHTML = '<p style="color: #ed4245;">Error al cargar estado del rol automático</p>';
+    }
+
+    // Event listeners
+    document.getElementById('autorol-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const roleId = select.value;
+        
+        if (!roleId) {
+            showMessage('Selecciona un rol', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/guilds/${guildId}/autorol`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roleId })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                showMessage('Rol automático configurado correctamente', 'success');
+                setupAutoRole(guildId, roles); // Refresh
+            } else {
+                showMessage(data.error || 'Error al configurar rol automático', 'error');
+            }
+        } catch (error) {
+            console.error('Error setting autorol:', error);
+            showMessage('Error al configurar rol automático', 'error');
+        }
+    });
+
+    removeBtn.addEventListener('click', async () => {
+        try {
+            const response = await fetch(`/api/guilds/${guildId}/autorol`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                showMessage('Rol automático eliminado correctamente', 'success');
+                setupAutoRole(guildId, roles); // Refresh
+            } else {
+                showMessage(data.error || 'Error al eliminar rol automático', 'error');
+            }
+        } catch (error) {
+            console.error('Error removing autorol:', error);
+            showMessage('Error al eliminar rol automático', 'error');
+        }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', init);

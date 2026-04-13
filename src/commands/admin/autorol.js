@@ -68,7 +68,7 @@ async function setAutoRole(interaction, client) {
     }
 
     try {
-        await client.db.setAutoRole(interaction.guild.id, role.id);
+        await client.db.setAutoRole(interaction.guild.id, role.id, interaction.user.id);
 
         const successEmbed = new EmbedBuilder()
             .setTitle('Rol Automático Configurado')

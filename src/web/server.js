@@ -548,7 +548,13 @@ async function buildGuildDetail(client, guildId, viewerUserId) {
         owners,
         bots,
         bans,
-        backups
+        backups,
+        roles: guild.roles.cache.map(role => ({
+            id: role.id,
+            name: role.name,
+            position: role.position,
+            color: role.hexColor
+        })).sort((a, b) => b.position - a.position)
     };
 }
 

@@ -747,3 +747,64 @@ body.light-mode .log-time {
 body.light-mode .log-message {
     color: #1a1a1a;
 }
+
+.form-select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #f1c40f;
+    box-shadow: 0 0 0 3px rgba(241, 196, 15, 0.2);
+}
+
+.status-info {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
+
+.info-box {
+    background: rgba(241, 196, 15, 0.1);
+    border: 1px solid rgba(241, 196, 15, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 0.9rem;
+}
+
+.info-box p {
+    margin: 4px 0;
+    color: #b9bbbe;
+}
+
+.info-box strong {
+    color: #f1c40f;
+}
+
+.btn-danger {
+    background: #ed4245;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-left: 8px;
+}
+
+.btn-danger:hover {
+    background: #c13538;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(237, 66, 69, 0.4);
+}
