@@ -709,17 +709,34 @@ class Database {
     setAutoRole(guildId, roleId, setBy) {
         const actorId = setBy || 'system';
         return new Promise((resolve, reject) => {
-            this.db.run(
-                'INSERT OR REPLACE INTO autorol (guild_id, role_id, set_by) VALUES (?, ?, ?)',
-                [guildId, roleId, actorId],
-                function(err) {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(this.lastID);
+            this.db.serialize(() => {
+                this.db.run(
+                    `CREATE TABLE IF NOT EXISTS autorol (
+                        guild_id TEXT PRIMARY KEY,
+                        role_id TEXT NOT NULL,
+                        set_by TEXT NOT NULL,
+                        set_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )`,
+                    (createErr) => {
+                        if (createErr) {
+                            reject(createErr);
+                            return;
+                        }
+
+                        this.db.run(
+                            'INSERT OR REPLACE INTO autorol (guild_id, role_id, set_by) VALUES (?, ?, ?)',
+                            [guildId, roleId, actorId],
+                            function(err) {
+                                if (err) {
+                                    reject(err);
+                                } else {
+                                    resolve(this.lastID);
+                                }
+                            }
+                        );
                     }
-                }
-            );
+                );
+            });
         });
     }
 
