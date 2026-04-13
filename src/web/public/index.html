@@ -137,8 +137,8 @@
                         <h2>¿Listo para proteger tu servidor?</h2>
                         <p>Únete a miles de servidores que confían en Ghostly Guard para mantenerse seguros.</p>
                         <div class="cta-buttons">
-                            <a href="/dashboard" class="btn btn-primary btn-lg">� Empezar Ahora</a>
-                            <a href="#" class="btn btn-secondary btn-lg">� Discord Soporte</a>
+                            <a href="/dashboard" class="btn btn-primary btn-lg">🚀 Empezar Ahora</a>
+                            <a href="https://discord.com/invite/FcbH8m4D" target="_blank" class="btn btn-secondary btn-lg">💬 Discord Soporte</a>
                         </div>
                     </div>
                 </div>
@@ -182,7 +182,7 @@
                     <div id="servers-grid" class="servers-grid-modern"></div>
                 </div>
 
-                <div class="quick-actions">
+                    <div class="quick-actions">
                     <h3>⚡ Acciones Rápidas</h3>
                     <div class="action-buttons">
                         <button class="action-btn" onclick="showMessage('Próximamente: Configuración global', 'info')">
@@ -197,6 +197,10 @@
                             <span class="action-icon">🌐</span>
                             <span>Blacklist</span>
                         </button>
+                        <a href="https://discord.gg/FcbH8m4D" target="_blank" class="action-btn">
+                            <span class="action-icon">💬</span>
+                            <span>Soporte Discord</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -310,14 +314,143 @@
                     </div> <!-- /tab-lists -->
                 </div> <!-- /guild-content -->
             </div> <!-- /guild page -->
+
+            <!-- Privacy Policy Page -->
+            <div id="privacy" class="page hidden legal-page">
+                <div class="legal-header">
+                    <button class="btn btn-secondary" onclick="showPage('landing')">← Volver</button>
+                    <h1>🔒 Política de Privacidad</h1>
+                </div>
+                <div class="legal-content">
+                    <section class="legal-section">
+                        <h2>1. Información que Recopilamos</h2>
+                        <p>Ghostly Guard recopila la siguiente información necesaria para el funcionamiento del bot:</p>
+                        <ul>
+                            <li><strong>IDs de Discord:</strong> IDs de servidores, usuarios, canales y roles para configuraciones de seguridad</li>
+                            <li><strong>Logs de seguridad:</strong> Registros de eventos de moderación (raids, bans, expulsiones)</li>
+                            <li><strong>Configuraciones:</strong> Preferencias de protección establecidas por administradores</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>2. Uso de la Información</h2>
+                        <p>La información recopilada se utiliza exclusivamente para:</p>
+                        <ul>
+                            <li>Proporcionar protección anti-raid y anti-nuke a servidores</li>
+                            <li>Generar logs de auditoría de seguridad</li>
+                            <li>Mejorar las funcionalidades de detección de amenazas</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>3. Almacenamiento y Seguridad</h2>
+                        <p>Los datos se almacenan en servidores seguros con las siguientes medidas:</p>
+                        <ul>
+                            <li>Encriptación de datos sensibles en reposo</li>
+                            <li>Acceso restringido únicamente al propietario del bot</li>
+                            <li>Retención limitada - los logs antiguos se eliminan automáticamente</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>4. Derechos de los Usuarios</h2>
+                        <p>Los usuarios tienen derecho a:</p>
+                        <ul>
+                            <li>Solicitar la eliminación de sus datos</li>
+                            <li>Acceder a los logs relacionados con su servidor</li>
+                            <li>Desactivar la recopilación de datos eliminando el bot del servidor</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>5. Contacto</h2>
+                        <p>Para cualquier consulta sobre privacidad, contáctanos en:</p>
+                        <a href="https://discord.gg/FcbH8m4D" target="_blank" class="btn btn-primary">Discord de Soporte</a>
+                    </section>
+                    
+                    <div class="legal-date">Última actualización: 12 de Abril, 2026</div>
+                </div>
+            </div>
+
+            <!-- Terms of Service Page -->
+            <div id="terms" class="page hidden legal-page">
+                <div class="legal-header">
+                    <button class="btn btn-secondary" onclick="showPage('landing')">← Volver</button>
+                    <h1>📜 Términos de Servicio</h1>
+                </div>
+                <div class="legal-content">
+                    <section class="legal-section">
+                        <h2>1. Aceptación de Términos</h2>
+                        <p>Al utilizar Ghostly Guard, aceptas estos términos en su totalidad. Si no estás de acuerdo, no utilices el bot.</p>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>2. Uso Permitido</h2>
+                        <p>Ghostly Guard debe utilizarse únicamente para:</p>
+                        <ul>
+                            <li>Proteger servidores de Discord contra raids y spam</li>
+                            <li>Moderar contenido malicioso de manera automatizada</li>
+                            <li>Gestionar configuraciones de seguridad legítimas</li>
+                        </ul>
+                        <p class="highlight-box">🚫 <strong>Prohibido:</strong> Usar el bot para evadir bans, atacar otros servidores, o cualquier actividad maliciosa.</p>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>3. Responsabilidades del Usuario</h2>
+                        <p>Como administrador del servidor, eres responsable de:</p>
+                        <ul>
+                            <li>Configurar correctamente las protecciones</li>
+                            <li>Revisar los logs de moderación</li>
+                            <li>Usar el bot de acuerdo con los Términos de Discord</li>
+                            <li>No abusar de las funciones de moderación automática</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>4. Limitación de Responsabilidad</h2>
+                        <p>Ghostly Guard se proporciona "tal cual". Hacemos nuestro mejor esfuerzo para mantener el bot funcionando 24/7, pero no garantizamos disponibilidad ininterrumpida.</p>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>5. Terminación</h2>
+                        <p>Nos reservamos el derecho de:</p>
+                        <ul>
+                            <li>Remover el bot de servidores que violen estos términos</li>
+                            <li>Suspender funciones en caso de uso abusivo</li>
+                            <li>Actualizar estos términos con notificación previa</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="legal-section">
+                        <h2>6. Soporte</h2>
+                        <p>Para soporte técnico o reportes:</p>
+                        <a href="https://discord.gg/FcbH8m4D" target="_blank" class="btn btn-primary">Servidor de Soporte</a>
+                    </section>
+                    
+                    <div class="legal-date">Última actualización: 12 de Abril, 2026</div>
+                </div>
+            </div>
         </main>
 
         <footer class="footer">
-            <div class="footer-links">
-                <a href="#">Política de privacidad</a>
-                <a href="#">Términos de servicio</a>
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <img src="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png" alt="Ghostly Guard" class="footer-logo">
+                    <span>Ghostly Guard</span>
+                </div>
+                <div class="footer-links">
+                    <a href="#" onclick="showPage('privacy'); return false;">🔒 Privacidad</a>
+                    <a href="#" onclick="showPage('terms'); return false;">📜 Términos</a>
+                    <a href="https://discord.gg/FcbH8m4D" target="_blank">💬 Soporte</a>
+                </div>
+                <div class="footer-social">
+                    <a href="https://discord.gg/FcbH8m4D" target="_blank" class="social-link" title="Discord">💬</a>
+                </div>
             </div>
-            <div class="footer-copy">© Ghostly Guard 2025-2026</div>
+            <div class="footer-bottom">
+                <div class="footer-copy">© 2025-2026 Ghostly Guard. Todos los derechos reservados.</div>
+                <div class="footer-made">Hecho con 🛡️ para proteger Discord</div>
+            </div>
         </footer>
 
         <div id="message" class="message hidden"></div>

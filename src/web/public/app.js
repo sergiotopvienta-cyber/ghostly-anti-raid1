@@ -388,14 +388,33 @@ function showPage(page) {
     const landingPage = document.getElementById('landing');
     const dashboardPage = document.getElementById('dashboard');
     const guildPage = document.getElementById('guild');
+    const privacyPage = document.getElementById('privacy');
+    const termsPage = document.getElementById('terms');
 
+    // Hide all pages
     if (landingPage) landingPage.classList.add('hidden');
     if (dashboardPage) dashboardPage.classList.add('hidden');
     if (guildPage) guildPage.classList.add('hidden');
+    if (privacyPage) privacyPage.classList.add('hidden');
+    if (termsPage) termsPage.classList.add('hidden');
 
+    // Show requested page
     if (page === 'landing' && landingPage) landingPage.classList.remove('hidden');
     if (page === 'dashboard' && dashboardPage) dashboardPage.classList.remove('hidden');
     if (page === 'guild' && guildPage) guildPage.classList.remove('hidden');
+    if (page === 'privacy' && privacyPage) {
+        privacyPage.classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+    if (page === 'terms' && termsPage) {
+        termsPage.classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+    
+    // Scroll to top when changing pages
+    if (page !== 'privacy' && page !== 'terms') {
+        window.scrollTo(0, 0);
+    }
 }
 
 function showToast(title, message, type = 'info', duration = 5000) {
