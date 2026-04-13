@@ -6,7 +6,7 @@ const { URL } = require('url');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SESSION_COOKIE = 'ghostly_session';
 const OAUTH_STATE_COOKIE = 'ghostly_oauth_state';
-const SESSION_TTL = 1000 * 60 * 60 * 24 * 7;
+const SESSION_TTL = 1000 * 60 * 60 * 24; // 24 horas
 
 const sessions = new Map();
 
@@ -114,11 +114,17 @@ async function handleAuthRequest(client, req, res, requestUrl) {
 
             setCookie(res, SESSION_COOKIE, sessionId, {
                 maxAge: SESSION_TTL / 1000,
-                httpOnly: true
+                httpOnly: true,
+                secure: true,
+                sameSite: 'lax'
             });
+            
+            // También enviar token de persistencia para localStorage
+            const persistentToken = crypto.randomBytes(32).toString('hex');
+            sessions.get(sessionId).persistentToken = persistentToken;
             clearCookie(res, OAUTH_STATE_COOKIE);
 
-            return redirect(res, '/dashboard?auth=success');
+            return redirect(res, `/dashboard?auth=success&token=${persistentToken}`);
         } catch (error) {
             console.error('OAuth callback error:', error);
             return redirect(res, '/?auth=failed');
@@ -155,11 +161,65 @@ async function handleApiRequest(client, req, res, requestUrl) {
                 return sendJson(res, 200, { authenticated: false, user: null, guilds: [] });
             }
 
+            // Extender sesión al usarla
+            session.expiresAt = Date.now() + SESSION_TTL;
+
             const guilds = await buildAllowedGuildList(client, session.user.id);
             return sendJson(res, 200, {
                 authenticated: true,
                 user: decorateUser(session.user),
-                guilds
+                guilds,
+                expiresAt: session.expiresAt
+            });
+        }
+
+        // Endpoint para restaurar sesión con token persistente
+        if (requestUrl.pathname === '/api/session/restore' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { persistentToken } = body;
+            
+            if (!persistentToken) {
+                return sendJson(res, 400, { error: 'Token requerido' });
+            }
+            
+            // Buscar sesión por token persistente
+            let foundSession = null;
+            let sessionId = null;
+            
+            for (const [sid, sess] of sessions.entries()) {
+                if (sess.persistentToken === persistentToken && sess.expiresAt > Date.now()) {
+                    foundSession = sess;
+                    sessionId = sid;
+                    break;
+                }
+            }
+            
+            if (!foundSession) {
+                return sendJson(res, 401, { error: 'Sesion expirada o invalida' });
+            }
+            
+            // Extender sesión
+            foundSession.expiresAt = Date.now() + SESSION_TTL;
+            
+            // Renovar cookie
+            setCookie(res, SESSION_COOKIE, sessionId, {
+                maxAge: SESSION_TTL / 1000,
+                httpOnly: true,
+                secure: true,
+                sameSite: 'lax'
+            });
+            
+            // Generar nuevo token persistente
+            const newPersistentToken = crypto.randomBytes(32).toString('hex');
+            foundSession.persistentToken = newPersistentToken;
+            
+            const guilds = await buildAllowedGuildList(client, foundSession.user.id);
+            return sendJson(res, 200, {
+                success: true,
+                user: decorateUser(foundSession.user),
+                guilds,
+                persistentToken: newPersistentToken,
+                expiresAt: foundSession.expiresAt
             });
         }
 
@@ -591,6 +651,21 @@ async function getGuildAccessLevel(client, guild, viewerUserId) {
     if (viewerUserId === guild.ownerId) return 'owner';
     if (await client.db.isTrustedUser(guild.id, viewerUserId, 'owner')) return 'secondary_owner';
     return null;
+}
+
+async function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                resolve(body ? JSON.parse(body) : {});
+            } catch (e) {
+                resolve({});
+            }
+        });
+        req.on('error', reject);
+    });
 }
 
 function getSession(req) {

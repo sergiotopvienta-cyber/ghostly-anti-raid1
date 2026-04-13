@@ -19,6 +19,10 @@ async function init() {
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
+            // Limpiar localStorage al hacer logout
+            localStorage.removeItem('ghostly_session_token');
+            localStorage.removeItem('ghostly_session_expires');
+            localStorage.removeItem('ghostly_user');
             window.location.href = '/auth/logout';
         });
     }
@@ -35,11 +39,58 @@ async function init() {
     }
 
     const path = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Guardar token persistente si viene de login exitoso
+    const authToken = urlParams.get('token');
+    if (authToken && urlParams.get('auth') === 'success') {
+        localStorage.setItem('ghostly_session_token', authToken);
+        localStorage.setItem('ghostly_session_expires', Date.now() + (24 * 60 * 60 * 1000)); // 24 horas
+        // Limpiar URL
+        window.history.replaceState({}, document.title, path);
+    }
 
     try {
-        const session = await fetch('/api/session').then(r => r.json());
+        let session = await fetch('/api/session').then(r => r.json());
+        
+        // Si no hay sesión activa, intentar restaurar desde localStorage
+        if (!session.authenticated) {
+            const persistentToken = localStorage.getItem('ghostly_session_token');
+            const expiresAt = localStorage.getItem('ghostly_session_expires');
+            
+            if (persistentToken && expiresAt && Date.now() < parseInt(expiresAt)) {
+                try {
+                    const restored = await fetch('/api/session/restore', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ persistentToken })
+                    }).then(r => r.json());
+                    
+                    if (restored.success) {
+                        // Guardar nuevo token
+                        localStorage.setItem('ghostly_session_token', restored.persistentToken);
+                        localStorage.setItem('ghostly_session_expires', restored.expiresAt);
+                        localStorage.setItem('ghostly_user', JSON.stringify(restored.user));
+                        
+                        session = {
+                            authenticated: true,
+                            user: restored.user,
+                            guilds: restored.guilds
+                        };
+                        
+                        showToast('Sesión restaurada', 'Bienvenido de vuelta', 'success');
+                    } else {
+                        // Token inválido, limpiar localStorage
+                        localStorage.removeItem('ghostly_session_token');
+                        localStorage.removeItem('ghostly_session_expires');
+                    }
+                } catch (e) {
+                    console.error('Error restaurando sesión:', e);
+                }
+            }
+        }
+        
         state.session = session;
-
         updateAuthUI(session);
 
         if (path === '/') {
@@ -94,15 +145,61 @@ function updateAuthUI(session) {
 async function refreshSession() {
     try {
         const session = await fetch('/api/session').then(r => r.json());
-        state.session = session;
-        updateAuthUI(session);
+        
+        if (session.authenticated) {
+            state.session = session;
+            updateAuthUI(session);
+            
+            // Actualizar expiración en localStorage
+            if (session.expiresAt) {
+                localStorage.setItem('ghostly_session_expires', session.expiresAt);
+            }
+        } else {
+            // Sesión expirada en servidor, intentar restaurar
+            const persistentToken = localStorage.getItem('ghostly_session_token');
+            const expiresAt = localStorage.getItem('ghostly_session_expires');
+            
+            if (persistentToken && expiresAt && Date.now() < parseInt(expiresAt)) {
+                try {
+                    const restored = await fetch('/api/session/restore', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ persistentToken })
+                    }).then(r => r.json());
+                    
+                    if (restored.success) {
+                        localStorage.setItem('ghostly_session_token', restored.persistentToken);
+                        localStorage.setItem('ghostly_session_expires', restored.expiresAt);
+                        
+                        state.session = {
+                            authenticated: true,
+                            user: restored.user,
+                            guilds: restored.guilds
+                        };
+                        updateAuthUI(state.session);
+                    } else {
+                        // No se pudo restaurar, limpiar
+                        localStorage.removeItem('ghostly_session_token');
+                        localStorage.removeItem('ghostly_session_expires');
+                        updateAuthUI({ authenticated: false });
+                    }
+                } catch (e) {
+                    console.error('Error en refresh session:', e);
+                }
+            } else {
+                // Token expirado, limpiar
+                localStorage.removeItem('ghostly_session_token');
+                localStorage.removeItem('ghostly_session_expires');
+                updateAuthUI({ authenticated: false });
+            }
+        }
     } catch (error) {
         console.error('Error refreshing session:', error);
     }
 }
 
 window.addEventListener('popstate', refreshSession);
-setInterval(refreshSession, 60000); // Más eficiente: 60s en lugar de 30s
+setInterval(refreshSession, 300000); // Cada 5 minutos (300,000 ms)
 
 async function loadServers() {
     const serversGrid = document.getElementById('servers-grid');
@@ -246,16 +343,28 @@ function renderList(containerId, items, type) {
     if (!container) return;
 
     if (!items || items.length === 0) {
-        container.innerHTML = '<p class="empty">Sin elementos</p>';
+        container.innerHTML = `
+            <div class="list-empty">
+                <div class="list-empty-icon">📭</div>
+                <p>No hay elementos en esta lista</p>
+            </div>
+        `;
         return;
     }
 
-    container.innerHTML = items.map(item => `
+    container.innerHTML = items.map(item => {
+        const id = item.user_id || item.id;
+        const name = item.user_tag || item.bot_name || item.reason || id;
+        
+        return `
         <div class="list-item">
-            <span>${item.user_id || item.id}</span>
-            <button onclick="removeItem('${type}', '${item.user_id || item.id}')">Eliminar</button>
+            <div>
+                <div class="list-item-name">${escapeHtml(name)}</div>
+                <div class="list-item-id">${id}</div>
+            </div>
+            <button class="list-item-remove" onclick="removeItem('${type}', '${id}')">🗑️ Eliminar</button>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 function setupForms(guildId) {

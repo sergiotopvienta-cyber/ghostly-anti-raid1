@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ghostly Guard - Dashboard</title>
-    <link rel="icon" type="image/png" href="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png?ex=69dc4abd&is=69daf93d&hm=c8db3c2353d0846612436f6daca0c14fa2d87918659e4de447861bca21fe22c3&=&format=webp&quality=lossless&width=64&height=64">
+    <link rel="icon" type="image/png" href="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png">
     <link rel="stylesheet" href="/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -12,7 +12,7 @@
     <div id="app">
         <nav class="navbar">
             <div class="nav-brand">
-                <img src="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png?ex=69dc4abd&is=69daf93d&hm=c8db3c2353d0846612436f6daca0c14fa2d87918659e4de447861bca21fe22c3&=&format=webp&quality=lossless&width=96&height=96" alt="Ghostly Guard Logo" class="nav-logo">
+                <img src="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png" alt="Ghostly Guard Logo" class="nav-logo" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                 <span>Ghostly Guard</span>
             </div>
             <div class="nav-links">
@@ -281,7 +281,7 @@
                         <div class="section">
                             <h3>Owners Secundarios</h3>
                             <form id="owner-form" class="add-form">
-                                <input type="text" id="owner-input" placeholder="ID del usuario">
+                                <input type="text" id="owner-input" class="form-input" placeholder="ID del usuario">
                                 <button type="submit" class="btn btn-primary">Agregar</button>
                             </form>
                             <div id="owners-list" class="list"></div>
@@ -289,7 +289,7 @@
                         <div class="section">
                             <h3>Whitelist</h3>
                             <form id="whitelist-form" class="add-form">
-                                <input type="text" id="whitelist-input" placeholder="ID del usuario">
+                                <input type="text" id="whitelist-input" class="form-input" placeholder="ID del usuario">
                                 <button type="submit" class="btn btn-primary">Agregar</button>
                             </form>
                             <div id="whitelist-list" class="list"></div>
@@ -297,7 +297,7 @@
                         <div class="section">
                             <h3>Bots Autorizados</h3>
                             <form id="bot-form" class="add-form">
-                                <input type="text" id="bot-input" placeholder="ID de bot">
+                                <input type="text" id="bot-input" class="form-input" placeholder="ID de bot">
                                 <button type="submit" class="btn btn-primary">Agregar</button>
                             </form>
                             <div id="bots-list" class="list"></div>
@@ -305,8 +305,8 @@
                         <div class="section">
                             <h3>Bans Permanentes</h3>
                             <form id="ban-form" class="add-form">
-                                <input type="text" id="ban-input" placeholder="ID a bloquear">
-                                <input type="text" id="ban-reason" placeholder="Motivo (opcional)">
+                                <input type="text" id="ban-input" class="form-input" placeholder="ID a bloquear">
+                                <input type="text" id="ban-reason" class="form-input" placeholder="Motivo (opcional)">
                                 <button type="submit" class="btn btn-primary">Agregar</button>
                             </form>
                             <div id="bans-list" class="list"></div>
@@ -435,7 +435,7 @@
         <footer class="footer">
             <div class="footer-content">
                 <div class="footer-brand">
-                    <img src="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png" alt="Ghostly Guard" class="footer-logo">
+                    <img src="https://media.discordapp.net/attachments/1492336176575676546/1492702181873287209/lOGO_ghg-fotor-2026041120455.png" alt="Ghostly Guard" class="footer-logo" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                     <span>Ghostly Guard</span>
                 </div>
                 <div class="footer-links">
