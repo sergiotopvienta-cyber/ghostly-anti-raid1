@@ -63,6 +63,24 @@ console.log(`\nTotal de comandos: ${commands.length}`);
 (async () => {
     try {
         console.log('\nRegistrando comandos en Discord...');
+
+        const commandScope = (process.env.COMMAND_SCOPE || 'global').toLowerCase();
+        const clearGlobal = process.env.CLEAR_GLOBAL_COMMANDS === '1' || commandScope === 'guild';
+
+        if (clearGlobal) {
+            console.log('\nLimpiando comandos globales (para evitar duplicados)...');
+            await rest.put(
+                Routes.applicationCommands(CLIENT_ID),
+                { body: [] }
+            );
+            console.log('✅ Comandos globales limpiados');
+        }
+
+        if (commandScope === 'guild') {
+            console.log('\nCOMMAND_SCOPE=guild: Saltando registro global (los guild commands se registran al iniciar el bot).');
+            console.log('Si necesitas registro global, cambia COMMAND_SCOPE=global y desactiva CLEAR_GLOBAL_COMMANDS.');
+            return;
+        }
         
         // Registrar comandos globales
         const data = await rest.put(
