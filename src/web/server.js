@@ -260,6 +260,7 @@ async function handleApiRequest(client, req, res, requestUrl) {
                 'anti_flood',
                 'anti_bots',
                 'anti_alts',
+                'anti_suspicious_names',
                 'anti_links',
                 'anti_mentions',
                 'anti_bot_verified_only',

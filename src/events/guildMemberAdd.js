@@ -120,28 +120,30 @@ module.exports = {
             return;
         }
 
-        // Detección de nombres sospechosos (bots/scam)
-        const suspiciousScore = SUSPICIOUS_PATTERNS.reduce((score, pattern) => {
-            return score + (pattern.test(member.user.username) ? 1 : 0);
-        }, 0);
+        // Detección de nombres sospechosos (bots/scam) - solo si está activado
+        if (settings.anti_suspicious_names) {
+            const suspiciousScore = SUSPICIOUS_PATTERNS.reduce((score, pattern) => {
+                return score + (pattern.test(member.user.username) ? 1 : 0);
+            }, 0);
 
-        if (suspiciousScore >= 2) {
-            try {
-                await member.kick('Nombre de usuario sospechoso detectado');
-            } catch (error) {
-                console.error('Error expulsando usuario con nombre sospechoso:', error.message);
+            if (suspiciousScore >= 2) {
+                try {
+                    await member.kick('Nombre de usuario sospechoso detectado');
+                } catch (error) {
+                    console.error('Error expulsando usuario con nombre sospechoso:', error.message);
+                }
+
+                await createSecurityEvent(client, member.guild, settings, {
+                    type: 'SUSPICIOUS_NAME',
+                    severity: 'medium',
+                    title: 'Nombre sospechoso detectado',
+                    color: '#e67e22',
+                    description: `${member.user.tag} fue expulsado por tener un nombre sospechoso de spam/bot.`,
+                    target: member.user,
+                    metadata: { username: member.user.username, suspiciousScore }
+                });
+                return;
             }
-
-            await createSecurityEvent(client, member.guild, settings, {
-                type: 'SUSPICIOUS_NAME_BLOCKED',
-                severity: 'medium',
-                title: 'Nombre sospechoso detectado',
-                color: '#e67e22',
-                description: `${member.user.tag} fue expulsado por tener un nombre sospechoso de spam/bot.`,
-                target: member.user,
-                metadata: { username: member.user.username, suspiciousScore }
-            });
-            return;
         }
 
         await assignVerificationRole(member, settings);

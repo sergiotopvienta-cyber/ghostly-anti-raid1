@@ -306,7 +306,7 @@ function renderSettingsForm(settings) {
     const form = document.getElementById('settings-form');
     const toggles = [
         'anti_raid', 'anti_nuke', 'anti_flood', 'anti_bots',
-        'anti_alts', 'anti_links', 'anti_mentions', 'anti_bot_verified_only', 'lockdown_active'
+        'anti_alts', 'anti_suspicious_names', 'anti_links', 'anti_mentions', 'anti_bot_verified_only', 'lockdown_active'
     ];
     const numbers = [
         'max_joins_per_minute', 'max_messages_per_second',
@@ -463,7 +463,7 @@ async function saveSettings() {
 
     const toggles = [
         'anti_raid', 'anti_nuke', 'anti_flood', 'anti_bots',
-        'anti_alts', 'anti_links', 'anti_mentions', 'anti_bot_verified_only', 'lockdown_active'
+        'anti_alts', 'anti_suspicious_names', 'anti_links', 'anti_mentions', 'anti_bot_verified_only', 'lockdown_active'
     ];
 
     toggles.forEach(key => {
@@ -605,7 +605,27 @@ function escapeHtml(text) {
 }
 
 function formatKey(key) {
-    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const labels = {
+        anti_raid: '🛡️ Anti-Raid',
+        anti_nuke: '💥 Anti-Nuke',
+        anti_flood: '💬 Anti-Flood',
+        anti_bots: '🤖 Anti-Bots',
+        anti_alts: '👤 Anti-Cuentas Nuevas',
+        anti_suspicious_names: '⚠️ Anti-Nombres Sospechosos',
+        anti_links: '🔗 Anti-Links',
+        anti_mentions: '📢 Anti-Menciones Spam',
+        anti_bot_verified_only: '✅ Solo Bots Verificados',
+        lockdown_active: '🔒 Lockdown Activo',
+        max_joins_per_minute: '⚡ Max Joins/Minuto',
+        max_messages_per_second: '📨 Max Msgs/Segundo',
+        max_mentions_per_message: '💬 Max Menciones',
+        min_account_age_days: '📅 Min Dias Cuenta',
+        log_channel: '📝 Canal Logs',
+        alert_channel: '🚨 Canal Alertas',
+        welcome_channel: '👋 Canal Bienvenida',
+        verification_role: '🎭 Rol Verificación'
+    };
+    return labels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 function toggleTheme() {
