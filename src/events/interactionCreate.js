@@ -1,8 +1,77 @@
-const { Events, Collection } = require('discord.js');
+const { Events, Collection, EmbedBuilder } = require('discord.js');
+const i18n = require('../utils/i18n');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
+        // Manejar botones de selección de idioma
+        if (interaction.isButton()) {
+            if (interaction.customId.startsWith('setlang_')) {
+                const parts = interaction.customId.split('_');
+                const guildId = parts[1];
+                const lang = parts[2];
+                
+                // Verificar que el usuario es el owner
+                const guild = client.guilds.cache.get(guildId);
+                if (!guild || guild.ownerId !== interaction.user.id) {
+                    return interaction.reply({
+                        content: '❌ Solo el owner del servidor puede cambiar el idioma.',
+                        ephemeral: true
+                    });
+                }
+                
+                // Guardar idioma en la base de datos
+                await client.db.setGuildLanguage(guildId, lang);
+                i18n.setGuildLanguage(guildId, lang);
+                
+                // Actualizar mensaje con confirmación
+                const confirmEmbed = new EmbedBuilder()
+                    .setTitle(lang === 'es' ? '✅ Idioma actualizado' : '✅ Language updated')
+                    .setColor('#57f287')
+                    .setDescription(
+                        lang === 'es' 
+                            ? `El idioma del servidor ha sido establecido a **Español** 🇪🇸.\n\nAhora puedes usar el comando \`/config server\` para ver la configuración.`
+                            : `Server language has been set to **English** 🇺🇸.\n\nYou can now use \`/config server\` to view the configuration.`
+                    )
+                    .setFooter({ text: 'Ghostly Guard' })
+                    .setTimestamp();
+                
+                await interaction.update({ embeds: [confirmEmbed], components: [] });
+                
+                // Enviar mensaje adicional con instrucciones
+                const instructionsEmbed = new EmbedBuilder()
+                    .setTitle(lang === 'es' ? '⚙️ Próximos pasos' : '⚙️ Next steps')
+                    .setColor('#f1c40f')
+                    .addFields(
+                        {
+                            name: lang === 'es' ? '1️⃣ Configurar alertas' : '1️⃣ Configure alerts',
+                            value: lang === 'es' 
+                                ? 'Usa `/alerts channel` para establecer donde recibirás notificaciones de seguridad.'
+                                : 'Use `/alerts channel` to set where you will receive security notifications.'
+                        },
+                        {
+                            name: lang === 'es' ? '2️⃣ Escanear seguridad' : '2️⃣ Scan security',
+                            value: lang === 'es'
+                                ? 'Usa `/securityscan` para ver qué tan seguro está tu servidor.'
+                                : 'Use `/securityscan` to see how secure your server is.'
+                        },
+                        {
+                            name: lang === 'es' ? '3️⃣ Ver configuración' : '3️⃣ View configuration',
+                            value: lang === 'es'
+                                ? 'Usa `/config server` para ver todas las funciones activadas.'
+                                : 'Use `/config server` to see all enabled features.'
+                        }
+                    )
+                    .setFooter({ 
+                        text: lang === 'es' ? '¿Necesitas ayuda? Únete al soporte' : 'Need help? Join support', 
+                        iconURL: client.user.displayAvatarURL() 
+                    });
+                
+                await interaction.followUp({ embeds: [instructionsEmbed], ephemeral: true });
+                return;
+            }
+        }
+
         if (!interaction.isChatInputCommand()) return;
 
         const command = client.commands.get(interaction.commandName);

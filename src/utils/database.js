@@ -30,6 +30,7 @@ class Database {
         const tables = [
             `CREATE TABLE IF NOT EXISTS guild_settings (
                 guild_id TEXT PRIMARY KEY,
+                language TEXT DEFAULT 'es',
                 anti_raid INTEGER DEFAULT 1,
                 anti_nuke INTEGER DEFAULT 1,
                 anti_flood INTEGER DEFAULT 1,
@@ -208,6 +209,7 @@ class Database {
     getDefaultSettings(guildId) {
         return {
             guild_id: guildId,
+            language: 'es',
             anti_raid: 1,
             anti_nuke: 1,
             anti_flood: 1,
@@ -245,6 +247,22 @@ class Database {
             this.db.run(
                 `UPDATE guild_settings SET ${setClause} WHERE guild_id = ?`,
                 [...values, guildId],
+                function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
+                    }
+                }
+            );
+        });
+    }
+
+    setGuildLanguage(guildId, language) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'UPDATE guild_settings SET language = ? WHERE guild_id = ?',
+                [language, guildId],
                 function(err) {
                     if (err) {
                         reject(err);
